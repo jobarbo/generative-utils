@@ -3,7 +3,7 @@ function keyPressed() {
 	if (key == 's' && (keyIsDown(91) || keyIsDown(93))) {
 		saveArtwork();
 		// prevent the browser from saving the page
-		return false;
+		return true;
 	}
 }
 
