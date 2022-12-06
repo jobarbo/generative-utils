@@ -6,13 +6,13 @@ let imul = Math.imul,
 	floor = Math.floor;
 // 2d value noise function
 const KNUTH = 0x9e3779b1;
-let NSEED = Math.random() * 2 ** 32;
+let NSEED = fxrand() * 2 ** 32;
 let ri = (i, j, k) => ((i = imul((((i & 1023) << 20) | ((j & 1023) << 10) | ((i ^ j ^ k) & 1023)) ^ NSEED, KNUTH)), (i <<= 3 + (i >>> 29)), (i >>> 1) / 2 ** 31 - 0.5);
-let na = F(99, (_) => Math.random() * Math.PI * 2);
+let na = F(99, (_) => fxrand() * Math.PI * 2);
 let ns = na.map(Math.sin),
 	nc = na.map(Math.cos);
-let nox = F(99, (_) => Math.random() * 1024);
-let noy = F(99, (_) => Math.random() * 1024);
+let nox = F(99, (_) => fxrand() * 1024);
+let noy = F(99, (_) => fxrand() * 1024);
 let nz = (x, y, s, i, c = nc[i] * s, n = ns[i] * s, xi = floor((([x, y] = [x * c + y * n + nox[i], y * c - x * n + noy[i]]), x)), yi = floor(y)) => ((x -= xi), (y -= yi), (x *= x * (3 - 2 * x)), (y *= y * (3 - 2 * y)), ri(xi, yi, i) * (1 - x) * (1 - y) + ri(xi, yi + 1, i) * (1 - x) * y + ri(xi + 1, yi, i) * x * (1 - y) + ri(xi + 1, yi + 1, i) * x * y);
 
 // the point of all the previous code is that now you have a very
