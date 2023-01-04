@@ -8,14 +8,18 @@ function generateConsoleLogs(params) {
 	}
 	var jbarbeau_logo =
 		'%c                                                                              \n' +
-		'%c     Art by Jonathan Barbeau and Melivoros  |  { @jbarbeau.art }  |  2022     \n' +
+		'%c                                                                              \n' +
+		'%c     Art by Jonathan Barbeau   |  { @jbarbeau.art }  |  2022                  \n' +
+		'%c                                                                              \n' +
 		'%c                                                                              \n';
 
 	console.log(
 		jbarbeau_logo,
-		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;',
-		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;',
-		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;'
+		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;margin-bottom:-1px;',
+		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;margin-bottom:-1px;',
+		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;margin-bottom:-1px;',
+		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;margin-bottom:-1px;',
+		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;margin-bottom:-1px;'
 	);
 	console.log(
 		'%cLa nuit porte... de garage\n',
