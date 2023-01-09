@@ -11,7 +11,21 @@ function keyPressed() {
 function saveArtwork() {
 	var dayoftheweek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 	var d = new Date();
-	var datestring = dayoftheweek[d.getDay()] + '_' + d.getDate() + '_' + d.getMonth() + '_' + d.getFullYear() + '_' + d.getHours() + '_' + d.getMinutes() + '_' + d.getSeconds();
+	var datestring =
+		dayoftheweek[d.getDay()] +
+		'_' +
+		d.getDate() +
+		'_' +
+		d.getMonth() +
+		'_' +
+		d.getFullYear() +
+		'_' +
+		d.getHours() +
+		'_' +
+		d.getMinutes() +
+		'_' +
+		d.getSeconds();
 	var fileName = datestring + '.png';
 	save(fileName);
+	console.log('saved ' + fileName);
 }
