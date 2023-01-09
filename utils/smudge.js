@@ -15,7 +15,7 @@ class Smudge {
 	}
 
 	display() {
-		this.xoff += width / 266666.67;
+		this.xoff += width / 26666.67;
 		this.yoff += width / 100000;
 		this.woff1 += width / 1454.55;
 
@@ -23,7 +23,7 @@ class Smudge {
 		const x = map(noise(this.xoff + this.rdnX), 0, 1, this.mapXLow, this.mapXHigh);
 		const y = map(noise(this.yoff + this.rdnY), 0, 1, this.mapYLow, this.mapYHigh);
 
-		fill(this.hue, 20, 100, this.alpha);
+		fill(this.hue, 10, 100, this.alpha);
 		noStroke();
 		rect(x, y, w1, w1);
 	}
