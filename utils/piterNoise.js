@@ -7,13 +7,35 @@ let imul = Math.imul,
 // 2d value noise function
 const KNUTH = 0x9e3779b1;
 let NSEED = fxrand() * 2 ** 32;
-let ri = (i, j, k) => ((i = imul((((i & 1023) << 20) | ((j & 1023) << 10) | ((i ^ j ^ k) & 1023)) ^ NSEED, KNUTH)), (i <<= 3 + (i >>> 29)), (i >>> 1) / 2 ** 31 - 0.5);
+let ri = (i, j, k) => (
+	(i = imul((((i & 1023) << 20) | ((j & 1023) << 10) | ((i ^ j ^ k) & 1023)) ^ NSEED, KNUTH)),
+	(i <<= 3 + (i >>> 29)),
+	(i >>> 1) / 2 ** 31 - 0.5
+);
 let na = F(99, (_) => fxrand() * Math.PI * 2);
 let ns = na.map(Math.sin),
 	nc = na.map(Math.cos);
 let nox = F(99, (_) => fxrand() * 1024);
 let noy = F(99, (_) => fxrand() * 1024);
-let nz = (x, y, s, i, c = nc[i] * s, n = ns[i] * s, xi = floor((([x, y] = [x * c + y * n + nox[i], y * c - x * n + noy[i]]), x)), yi = floor(y)) => ((x -= xi), (y -= yi), (x *= x * (3 - 2 * x)), (y *= y * (3 - 2 * y)), ri(xi, yi, i) * (1 - x) * (1 - y) + ri(xi, yi + 1, i) * (1 - x) * y + ri(xi + 1, yi, i) * x * (1 - y) + ri(xi + 1, yi + 1, i) * x * y);
+let nz = (
+	x,
+	y,
+	s,
+	i,
+	c = nc[i] * s,
+	n = ns[i] * s,
+	xi = floor((([x, y] = [x * c + y * n + nox[i], y * c - x * n + noy[i]]), x)),
+	yi = floor(y)
+) => (
+	(x -= xi),
+	(y -= yi),
+	(x *= x * (3 - 2 * x)),
+	(y *= y * (3 - 2 * y)),
+	ri(xi, yi, i) * (1 - x) * (1 - y) +
+		ri(xi, yi + 1, i) * (1 - x) * y +
+		ri(xi + 1, yi, i) * x * (1 - y) +
+		ri(xi + 1, yi + 1, i) * x * y
+);
 
 // the point of all the previous code is that now you have a very
 // fast value noise function called nz(x,y,s,i). It has four parameters:
@@ -31,8 +53,24 @@ let nz = (x, y, s, i, c = nc[i] * s, n = ns[i] * s, xi = floor((([x, y] = [x * c
 function n3(x, y, s, i) {
 	// this function adds together 3 noises, in "octaves". This means
 	// it adds the first noise normally, the second noise has double the scale but half the amplitude, and the third noise has four times the scale and a quarter of the amplitude (if you want to add more it would be 8, 16, 32, etc)
-	i *= 3; // multiply the noise index by 3 because we use three noises
-	return nz(x, y, s, i) + nz(x, y, s * 2, i + 1) / 2 + nz(x, y, s * 4, i + 2) / 4;
+	i *= 15; // multiply the noise index by 3 because we use three noises
+	return (
+		nz(x, y, s, i) +
+		nz(x, y, s * 2, i + 1) / 2 +
+		nz(x, y, s * 4, i + 2) / 4 +
+		nz(x, y, s * 8, i + 3) / 8 +
+		nz(x, y, s * 16, i + 4) / 16 +
+		nz(x, y, s * 32, i + 5) / 32 +
+		nz(x, y, s * 64, i + 6) / 64 +
+		nz(x, y, s * 128, i + 7) / 128 +
+		nz(x, y, s * 256, i + 8) / 256 +
+		nz(x, y, s * 512, i + 9) / 512 +
+		nz(x, y, s * 1024, i + 10) / 1024 +
+		nz(x, y, s * 2048, i + 11) / 2048 +
+		nz(x, y, s * 4096, i + 12) / 4096 +
+		nz(x, y, s * 8192, i + 13) / 8192 +
+		nz(x, y, s * 16384, i + 14) / 16384
+	);
 	// the result of this is that you get a better quality "cloudy" kind
 	// of noise, often called fBm ("fractal Brownian motion"). It is also
 	// often confused with Perlin noise but it's not.
