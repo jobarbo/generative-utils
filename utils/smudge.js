@@ -11,7 +11,7 @@ class Smudge {
 		this.mapXHigh = width * 3;
 		this.mapYLow = -height * 3;
 		this.mapYHigh = height * 3;
-		this.alpha = int(random(0, 100));
+		this.alpha = int(random(0, 50));
 		this.hue = hue(color);
 		this.sat = saturation(color);
 		this.bri = brightness(color);
@@ -40,7 +40,7 @@ class Smudge {
 		this.w = map(noise(this.woff1), 0, 1, this.minWidth, this.maxWidth, true);
 		this.x = map(noise(this.xoff), 0, 1, this.mapXHigh, this.mapXLow, true);
 		this.y = map(noise(this.yoff), 0, 1, this.mapYHigh, this.mapYLow, true);
-		this.alpha = map(noise(this.woff1), 0.6, 1, 1, 50, true);
+		this.alpha = map(noise(this.woff1), 0.6, 1, 1, 20, true);
 
 		this.offset = this.w / 2;
 		noStroke();
