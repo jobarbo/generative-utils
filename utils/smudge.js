@@ -40,7 +40,7 @@ class Smudge {
 		this.w = map(noise(this.woff1), 0, 1, this.minWidth, this.maxWidth, true);
 		this.x = map(noise(this.xoff), 0, 1, this.mapXHigh, this.mapXLow, true);
 		this.y = map(noise(this.yoff), 0, 1, this.mapYHigh, this.mapYLow, true);
-		this.alpha = map(noise(this.woff1), 0.6, 1, 0, 50, true);
+		this.alpha = map(noise(this.woff1), 0.6, 1, 1, 50, true);
 
 		this.offset = this.w / 2;
 		noStroke();
