@@ -8,6 +8,12 @@ class Horizon {
 		console.log('drawing horizon line');
 		stroke(0, 0, 100, 100);
 		line(0, this.y, width, this.y);
+		line(0, height, width, height);
+		line(0, this.y, 0, height);
+		line(width, this.y, width, height);
+		// diagonal lines
+		line(0, this.y, width, height);
+		line(width, this.y, 0, height);
 	}
 
 	// Check if an element is above or below the horizon line
