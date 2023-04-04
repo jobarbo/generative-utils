@@ -1,5 +1,5 @@
 class Horizon {
-	constructor(y) {
+	constructor(y = 0) {
 		this.y = y;
 		this._debug = false;
 	}
