@@ -1,6 +1,9 @@
 // if cmd + s is pressed, save the canvas'
+
 function keyPressed() {
+	console.log('key pressed', key);
 	if (key == 's' && (keyIsDown(91) || keyIsDown(93))) {
+		console.log('saving canvas');
 		saveArtwork();
 		// prevent the browser from saving the page
 		return false;
@@ -26,11 +29,9 @@ function saveArtwork() {
 	];
 	var d = new Date();
 	var datestring =
-		dayoftheweek[d.getDay()] +
-		'_' +
-		monthoftheyear[d.getMonth()] +
-		'_' +
 		d.getDate() +
+		'_' +
+		(d.getMonth() + 1) +
 		'_' +
 		d.getFullYear() +
 		'_' +
