@@ -4,7 +4,7 @@
 let F = (N, f) => [...Array(N)].map((_) => f()); // loop function
 let imul = Math.imul,
 	floor = Math.floor;
-// 2d value noise function
+// 2d value noise functions
 const KNUTH = 0x9e3779b1;
 let NSEED = fxrand() * 2 ** 32;
 let ri = (i, j, k) => (
