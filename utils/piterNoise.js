@@ -4,7 +4,8 @@ TAU = PI * 2;
 F = (N, f) => [...Array(N)].map((_, i) => f(i)); // for loop / map / list function
 
 // A seeded PRNG =========================================================
-seed = 'Twelve Bored Monkeys'; // random seed
+//seed = 'das9d7as9d7as'; // random seed]
+seed = Math.random() * 2 ** 32;
 S = Uint32Array.of(9, 7, 5, 3); // PRNG state
 R = (a = 1) =>
 	a *
