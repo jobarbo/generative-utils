@@ -5,7 +5,10 @@ F = (N, f) => [...Array(N)].map((_, i) => f(i)); // for loop / map / list functi
 
 // A seeded PRNG =========================================================
 //seed = 'das9d7as9d7as'; // random seed]
-seed = Math.random() * 2 ** 32;
+//seed = Math.random() * 2 ** 32;
+
+seed = fxrand() * 10000;
+
 S = Uint32Array.of(9, 7, 5, 3); // PRNG state
 R = (a = 1) =>
 	a *
