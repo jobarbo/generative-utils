@@ -87,6 +87,15 @@ n2 = (
 		ri(xi + 1, yi + 1, i) * x * y
 );
 
+//! Spell formula from Piter The Mage
+ZZ = (x, m, b, r) =>
+	x < 0
+		? x
+		: x > (b *= r * 4)
+		? x - b
+		: ((x /= r), FR(x / 4) < 0.5 ? r : -r) *
+		  ((x = B(FR(x / 2) - 0.5)), 1 - (x > m ? x * 2 : x * (x /= m) * x * (2 - x) + m));
+
 // the point of all the previous code is that now you have a very
 // fast value noise function called nz(x,y,s,i). It has four parameters:
 // x -- the x coordinate
