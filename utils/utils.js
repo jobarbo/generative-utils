@@ -16,3 +16,10 @@ function weighted_choice(data) {
 	}
 	return data[data.length - 1][0];
 }
+
+const mapValue = (v, cl, cm, tl, th, c) =>
+	c ? Math.min(Math.max(((v - cl) / (cm - cl)) * (th - tl) + tl, tl), th) : ((v - cl) / (cm - cl)) * (th - tl) + tl;
+
+let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+let smoothstep = (a, b, x) => (((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
+let mix = (a, b, p) => a + p * (b - a);
