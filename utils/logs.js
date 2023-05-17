@@ -1,4 +1,4 @@
-//* CONSOLE LOGGING *//
+//* CONSOLE LOGGINGS *//
 
 function generateConsoleLogs(params) {
 	//* UNPACK PARAMETERS *//
@@ -21,20 +21,11 @@ function generateConsoleLogs(params) {
 		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;margin-bottom:-1px;',
 		'color: white; background: #000000; font-weight: bold; font-family: "Courier New", monospace;margin-bottom:-1px;'
 	);
-	console.log(
-		'%cLa nuit porte... de garage\n',
-		'font-style: italic; font-family: "Courier New", monospace;'
-	);
+	console.log('%cLa nuit porte... de garage\n', 'font-style: italic; font-family: "Courier New", monospace;');
 
 	// console table all params with their values
 	console.table('%cTOKEN FEATURES', 'color: white; background: #000000;', '\n', params);
 
-	console.log(
-		'%cCONTROLS',
-		'color: white; background: #000000;',
-		'\n',
-		'cmd + s   : save artwork with date',
-		'\n'
-	);
+	console.log('%cCONTROLS', 'color: white; background: #000000;', '\n', 'cmd + s   : save artwork with date', '\n');
 }
 //* END CONSOLE LOGGING *//s
