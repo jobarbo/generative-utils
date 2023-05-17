@@ -1,4 +1,4 @@
-//* CONSOLE LOGGINGS *//
+//* CONSOLE LOGS AND ALL *//
 
 function generateConsoleLogs(params) {
 	//* UNPACK PARAMETERS *//
