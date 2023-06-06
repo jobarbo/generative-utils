@@ -79,8 +79,8 @@ n2 = (
 	n = ns[i] * s,
 	xi = floor(
 		(([x, y] = [
-			(x - noiseCanvasWidth / 2) * c + (y - noiseCanvasHeight / 2) * n + nox[i],
-			(y - noiseCanvasHeight / 2) * c - (x - noiseCanvasWidth / 2) * n + noy[i],
+			(x - noiseCanvasWidth / 2) * c + (y - noiseCanvasHeight * 2) * n + nox[i],
+			(y - noiseCanvasHeight * 2) * c - (x - noiseCanvasWidth / 2) * n + noy[i],
 		]),
 		x)
 	),
