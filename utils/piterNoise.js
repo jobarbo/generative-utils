@@ -118,7 +118,7 @@ ZZ = (x, m, b, r) =>
 // ohh also important to mention that it returns smooth noise values
 // between -.5 and .5
 
-function oct1(x, y, s, i, ox, oy) {
+function oct1(x, y, s, i) {
 	// this function adds together 1 noise, in "octaves". This means
 	// it adds the first noise normally
 	return n2(x, y, s, i);
@@ -127,7 +127,7 @@ function oct1(x, y, s, i, ox, oy) {
 	// often confused with Perlin noise but it's not.
 }
 
-function oct2(x, y, s, i, ox, oy) {
+function oct2(x, y, s, i) {
 	// this function adds together 2 noises, in "octaves". This means
 	// it adds the first noise normally, and the second noise has double the scale but half the amplitude
 	i *= 2; // multiply the noise index by 2 because we use two noises
@@ -137,7 +137,7 @@ function oct2(x, y, s, i, ox, oy) {
 	// often confused with Perlin noise but it's not.
 }
 
-function oct3(x, y, s, i, ox, oy) {
+function oct3(x, y, s, i) {
 	// this function adds together 3 noises, in "octaves". This means
 	// it adds the first noise normally, the second noise has double the scale but half the amplitude, and the third noise has four times the scale and a quarter of the amplitude (if you want to add more it would be 8, 16, 32, etc)
 	i *= 3; // multiply the noise index by 3 because we use three noises
@@ -147,7 +147,7 @@ function oct3(x, y, s, i, ox, oy) {
 	// often confused with Perlin noise but it's not.
 }
 
-function oct4(x, y, s, i, ox, oy) {
+function oct4(x, y, s, i) {
 	// this function adds together 3 noises, in "octaves". This means
 	// it adds the first noise normally, the second noise has double the scale but half the amplitude, and the third noise has four times the scale and a quarter of the amplitude (if you want to add more it would be 8, 16, 32, etc)
 	i *= 4; // multiply the noise index by 3 because we use three noises
@@ -157,7 +157,7 @@ function oct4(x, y, s, i, ox, oy) {
 	// often confused with Perlin noise but it's not.
 }
 
-function oct5(x, y, s, i, ox, oy) {
+function oct5(x, y, s, i) {
 	// this function adds together 3 noises, in "octaves". This means
 	// it adds the first noise normally, the second noise has double the scale but half the amplitude, and the third noise has four times the scale and a quarter of the amplitude (if you want to add more it would be 8, 16, 32, etc)
 	i *= 5; // multiply the noise index by 3 because we use three noises
@@ -173,7 +173,7 @@ function oct5(x, y, s, i, ox, oy) {
 	// often confused with Perlin noise but it's not.
 }
 
-function oct6(x, y, s, i, ox, oy) {
+function oct6(x, y, s, i) {
 	// this function adds together 3 noises, in "octaves". This means
 	// it adds the first noise normally, the second noise has double the scale but half the amplitude, and the third noise has four times the scale and a quarter of the amplitude (if you want to add more it would be 8, 16, 32, etc)
 	i *= 6; // multiply the noise index by 3 because we use three noises
