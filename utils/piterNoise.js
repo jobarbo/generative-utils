@@ -118,74 +118,13 @@ ZZ = (x, m, b, r) =>
 // ohh also important to mention that it returns smooth noise values
 // between -.5 and .5
 
-function oct1(x, y, s, i) {
-	// this function adds together 1 noise, in "octaves". This means
-	// it adds the first noise normally
-	return n2(x, y, s, i);
-	// the result of this is that you get a better quality "cloudy" kind
-	// of noise, often called fBm ("fractal Brownian motion"). It is also
-	// often confused with Perlin noise but it's not.
-}
-
-function oct2(x, y, s, i) {
-	// this function adds together 2 noises, in "octaves". This means
-	// it adds the first noise normally, and the second noise has double the scale but half the amplitude
-	i *= 2; // multiply the noise index by 2 because we use two noises
-	return n2(x, y, s, i) + n2(x, y, s * 2, i + 1) / 2;
-	// the result of this is that you get a better quality "cloudy" kind
-	// of noise, often called fBm ("fractal Brownian motion"). It is also
-	// often confused with Perlin noise but it's not.
-}
-
-function oct3(x, y, s, i) {
-	// this function adds together 3 noises, in "octaves". This means
-	// it adds the first noise normally, the second noise has double the scale but half the amplitude, and the third noise has four times the scale and a quarter of the amplitude (if you want to add more it would be 8, 16, 32, etc)
-	i *= 3; // multiply the noise index by 3 because we use three noises
-	return n2(x, y, s, i) + n2(x, y, s * 2, i + 1) / 2 + n2(x, y, s * 4, i + 2) / 4;
-	// the result of this is that you get a better quality "cloudy" kind
-	// of noise, often called fBm ("fractal Brownian motion"). It is also
-	// often confused with Perlin noise but it's not.
-}
-
-function oct4(x, y, s, i) {
-	// this function adds together 3 noises, in "octaves". This means
-	// it adds the first noise normally, the second noise has double the scale but half the amplitude, and the third noise has four times the scale and a quarter of the amplitude (if you want to add more it would be 8, 16, 32, etc)
-	i *= 4; // multiply the noise index by 3 because we use three noises
-	return n2(x, y, s, i) + n2(x, y, s * 2, i + 1) / 2 + n2(x, y, s * 4, i + 2) / 4 + n2(x, y, s * 8, i + 3) / 8;
-	// the result of this is that you get a better quality "cloudy" kind
-	// of noise, often called fBm ("fractal Brownian motion"). It is also
-	// often confused with Perlin noise but it's not.
-}
-
-function oct5(x, y, s, i) {
-	// this function adds together 3 noises, in "octaves". This means
-	// it adds the first noise normally, the second noise has double the scale but half the amplitude, and the third noise has four times the scale and a quarter of the amplitude (if you want to add more it would be 8, 16, 32, etc)
-	i *= 5; // multiply the noise index by 3 because we use three noises
-	return (
-		n2(x, y, s, i) +
-		n2(x, y, s * 2, i + 1) / 2 +
-		n2(x, y, s * 4, i + 2) / 4 +
-		n2(x, y, s * 8, i + 3) / 8 +
-		n2(x, y, s * 16, i + 4) / 16
-	);
-	// the result of this is that you get a better quality "cloudy" kind
-	// of noise, often called fBm ("fractal Brownian motion"). It is also
-	// often confused with Perlin noise but it's not.
-}
-
-function oct6(x, y, s, i) {
-	// this function adds together 3 noises, in "octaves". This means
-	// it adds the first noise normally, the second noise has double the scale but half the amplitude, and the third noise has four times the scale and a quarter of the amplitude (if you want to add more it would be 8, 16, 32, etc)
-	i *= 6; // multiply the noise index by 3 because we use three noises
-	return (
-		n2(x, y, s, i) +
-		n2(x, y, s * 2, i + 1) / 2 +
-		n2(x, y, s * 4, i + 2) / 4 +
-		n2(x, y, s * 8, i + 3) / 8 +
-		n2(x, y, s * 16, i + 4) / 16 +
-		n2(x, y, s * 32, i + 5) / 32
-	);
-	// the result of this is that you get a better quality "cloudy" kind
-	// of noise, often called fBm ("fractal Brownian motion"). It is also
-	// often confused with Perlin noise but it's not.
+function oct(x, y, s, i, octaves) {
+	let result = 0;
+	let sm = 1;
+	i *= octaves;
+	for (let j = 0; j < octaves; j++) {
+		result += n2(x, y, s * sm, i + j) / sm;
+		sm *= 2;
+	}
+	return result;
 }
