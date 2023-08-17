@@ -118,7 +118,7 @@ ZZ = (x, m, b, r) =>
 // ohh also important to mention that it returns smooth noise values
 // between -.5 and .5
 
-function oct(x, y, s, i, octaves) {
+function oct(x, y, s, i, octaves = 1) {
 	let result = 0;
 	let sm = 1;
 	i *= octaves;
