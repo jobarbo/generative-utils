@@ -23,3 +23,18 @@ const mapValue = (v, cl, cm, tl, th, c) =>
 let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 let smoothstep = (a, b, x) => (((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
 let mix = (a, b, p) => a + p * (b - a);
+
+let dpi = (maxDPI = 3.0) => {
+	let formatMode = features.format_mode;
+	var ua = window.navigator.userAgent;
+	var iOS = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i);
+	var webkit = !!ua.match(/WebKit/i);
+	var iOSSafari = iOS && webkit && !ua.match(/CriOS/i);
+
+	// if safari mobile use pixelDensity(2.0) to make the canvas bigger else use pixelDensity(3.0)
+	if (iOSSafari) {
+		return 1.0;
+	} else {
+		return maxDPI;
+	}
+};
