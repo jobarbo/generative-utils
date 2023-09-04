@@ -16,7 +16,6 @@ if (navigator.requestMIDIAccess) {
 		console.log(xtouch);
 
 		xtouch.onmidimessage = ({data}) => {
-			console.log(data);
 			const knobValue = (data[2] / 128) * 100; // Calculate knob value as percentage
 			knob[data[1]] = knobValue;
 			kval = knobValue;
