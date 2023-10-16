@@ -1,11 +1,15 @@
 // if cmd + s is pressed, save the canvas'
-function keyPressed() {
-	if (key == 's' && (keyIsDown(91) || keyIsDown(93))) {
+function saveCanvas(event) {
+	if (event.key === 's' && (event.metaKey || event.ctrlKey)) {
 		saveArtwork();
-		// prevent the browser from saving the page
+		// Prevent the browser from saving the page
+		event.preventDefault();
 		return false;
 	}
 }
+
+// Example usage to add an event listener for key presses
+document.addEventListener('keydown', saveCanvas);
 
 // make a function to save the canvas as a png file with the git branch name and a timestamp
 function saveArtwork() {
