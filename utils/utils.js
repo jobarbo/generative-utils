@@ -23,6 +23,7 @@ const mapValue = (v, cl, cm, tl, th, c) =>
 let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 let smoothstep = (a, b, x) => (((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
 let mix = (a, b, p) => a + p * (b - a);
+let dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
 
 let dpi = (maxDPI = 3.0) => {
 	let formatMode = features.format_mode;
