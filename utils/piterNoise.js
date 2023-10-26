@@ -128,3 +128,48 @@ function oct(x, y, s, i, octaves = 1) {
 	}
 	return result;
 }
+
+function superCurve(x, y, scl1, scl2, ang1, ang2, octave, ns) {
+	let nx = x,
+		ny = y,
+		a1 = ang1,
+		a2 = ang2,
+		scale1 = scl1,
+		scale2 = scl2,
+		noiseSpeed = ns,
+		dx,
+		dy;
+
+	dx = oct(nx, ny, scale1, 0, octave);
+	dy = oct(nx, ny, scale2, 2, octave);
+	nx += dx * a1;
+	ny += dy * a2;
+
+	dx = oct(nx, ny, scale1, 1, octave);
+	dy = oct(nx, ny, scale2, 3, octave);
+	nx += dx * a1;
+	ny += dy * a2;
+
+	dx = oct(nx, ny, scale1, 1, octave);
+	dy = oct(nx, ny, scale2, 2, octave);
+	nx += dx * a1;
+	ny += dy * a2;
+
+	let un = oct(nx, ny, scale1, 3, octave);
+	let vn = oct(nx, ny, scale2, 2, octave);
+
+	/* 	let u = clamp(un + 0.5, 0, 1) * 21 - 1;
+	let v = clamp(vn + 0.5, 0, 1) * 21 - 20; */
+
+	let rangeA = [10, 15, 20];
+	let rangeB = [1, 2, 3];
+
+	let aValue = rangeA[Math.floor(fxrand() * rangeA.length)];
+	let bValue = rangeB[Math.floor(fxrand() * rangeB.length)];
+
+	let u = mapValue(un, -noiseSpeed, noiseSpeed, -aValue, bValue);
+	let v = mapValue(vn, -noiseSpeed, noiseSpeed, -bValue, aValue);
+
+	//let p = createVector(u, v);
+	return {x: u, y: v};
+}
