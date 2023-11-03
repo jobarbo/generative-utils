@@ -40,11 +40,11 @@ function sdf_circle([x, y], [cx, cy], r) {
 }
 
 let dpi = (maxDPI = 3.0) => {
-	let formatMode = features.format_mode;
 	var ua = window.navigator.userAgent;
 	var iOS = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i);
 	var webkit = !!ua.match(/WebKit/i);
 	var iOSSafari = iOS && webkit && !ua.match(/CriOS/i);
+	console.log('DPI');
 
 	// if safari mobile use pixelDensity(2.0) to make the canvas bigger else use pixelDensity(3.0)
 	if (iOSSafari) {
