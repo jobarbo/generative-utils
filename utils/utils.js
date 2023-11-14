@@ -21,7 +21,7 @@ function weighted_choice(data) {
 	return data[data.length - 1][0];
 }
 
-let mapValue2 = (v, s, S, a, b) => ((v = Math.min(Math.max(v, s), S)), ((v - s) * (b - a)) / (S - s) + a);
+let mapValue = (v, s, S, a, b) => ((v = Math.min(Math.max(v, s), S)), ((v - s) * (b - a)) / (S - s) + a);
 const pmap = (v, cl, cm, tl, th, c) =>
 	c ? Math.min(Math.max(((v - cl) / (cm - cl)) * (th - tl) + tl, tl), th) : ((v - cl) / (cm - cl)) * (th - tl) + tl;
 
