@@ -1,10 +1,3 @@
-//FXHASH random function for specific implimentation
-fxrand = $fx.rand;
-rand = fxrand;
-fx = $fx;
-fxhash = $fx.hash;
-features = $fx.getFeatures();
-
 function weighted_choice(data) {
 	let total = 0;
 	for (let i = 0; i < data.length; ++i) {
