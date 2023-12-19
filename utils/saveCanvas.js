@@ -1,6 +1,6 @@
 // if cmd + s is pressed, save the canvas'
 function saveCanvas(event) {
-	if (event.key === 's' && (event.metaKey || event.ctrlKey)) {
+	if (event.key === "s" && (event.metaKey || event.ctrlKey)) {
 		saveArtwork();
 		// Prevent the browser from saving the page
 		event.preventDefault();
@@ -9,36 +9,31 @@ function saveCanvas(event) {
 }
 
 // Example usage to add an event listener for key presses
-document.addEventListener('keydown', saveCanvas);
+document.addEventListener("keydown", saveCanvas);
 
 // make a function to save the canvas as a png file with the git branch name and a timestamp
 function saveArtwork() {
-	var dayoftheweek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-	var monthoftheyear = [
-		'january',
-		'february',
-		'march',
-		'april',
-		'may',
-		'june',
-		'july',
-		'august',
-		'september',
-		'october',
-		'november',
-		'december',
-	];
+	var dom_spin = document.querySelector(".spin-container");
+	var canvas = document.getElementById("defaultCanvas0");
 	var d = new Date();
 	var datestring =
 		d.getDate() +
-		'_' +
+		"_" +
 		`${d.getMonth() + 1}` +
-		'_' +
+		"_" +
 		d.getFullYear() +
-		'_' +
+		"_" +
 		`${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
-	var fileName = datestring + '.png';
+	console.log(canvas);
+	var fileName = datestring + ".png";
+	const imageUrl = canvas
+		.toDataURL("image/png")
+		.replace("image/png", "image/octet-stream");
+	const a = document.createElement("a");
+	a.href = imageUrl;
+	a.setAttribute("download", fileName);
+	a.click();
 
-	save(fileName);
-	console.log('saved ' + fileName);
+	dom_spin.classList.remove("active");
+	console.log("saved " + fileName);
 }

@@ -1,3 +1,4 @@
+
 function weighted_choice(data) {
 	let total = 0;
 	for (let i = 0; i < data.length; ++i) {
@@ -32,34 +33,18 @@ let R = (a = 1) => Math.random() * a;
 let L = (x, y) => (x * x + y * y) ** 0.5; // Elements by Euclid 300 BC
 let k = (a, b) => (a > 0 && b > 0 ? L(a, b) : a > b ? a : b);
 
-function sdf_box([x, y], [cx, cy], [w, h]) {
-	x -= cx;
-	y -= cy;
-	return k(abs(x) - w, abs(y) - h);
-}
-
-function sdf_circle([x, y], [cx, cy], r) {
-	x -= cx;
-	y -= cy;
-	return L(x, y) - r;
-}
-
 let dpi = (maxDPI = 3.0) => {
 	var ua = window.navigator.userAgent;
 	var iOS = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i);
 	var webkit = !!ua.match(/WebKit/i);
 	var iOSSafari = iOS && webkit && !ua.match(/CriOS/i);
-
-	// if safari mobile use pixelDensity(2.0) to make the canvas bigger else use pixelDensity(3.0)
+	let mobileDPI = maxDPI * 2;
 	if (iOSSafari) {
-		return 1.0;
+		if (mobileDPI > 6) {
+			mobileDPI = 6;
+		}
+		return mobileDPI;
 	} else {
 		return maxDPI;
 	}
 };
-// fx(hash) utilities
-const value = () => fxrand();
-const range = (min, max) => min + value() * (max - min);
-const rangeFloor = (min, max) => floor(range(min, max));
-const pick = (arr) => arr[rangeFloor(0, arr.length)];
-console.log("value: ", value());
