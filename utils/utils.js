@@ -219,3 +219,7 @@ function saveArtwork() {
 	//dom_spin.classList.remove("active");
 	console.log("saved " + fileName);
 }
+
+
+// url search params
+const sp = new URLSearchParams(window.location.search);
