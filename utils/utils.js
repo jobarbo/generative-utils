@@ -181,12 +181,12 @@ let dpi = (maxDPI = 3.0) => {
 
 // if cmd + s is pressed, save the canvas'
 function saveCanvas(event) {
+	console.log('saveCanvas function called');
 	if (event.key === "s" && (event.metaKey || event.ctrlKey)) {
-		saveArtwork();
-		event.preventDefault();
-		// Prevent the browser from saving the page
-
-		return false;
+			console.log('Save shortcut detected');
+			saveArtwork();
+			event.preventDefault();
+			return false;
 	}
 }
 
@@ -216,6 +216,6 @@ function saveArtwork() {
 	a.setAttribute("download", fileName);
 	a.click();
 
-	dom_spin.classList.remove("active");
+	//dom_spin.classList.remove("active");
 	console.log("saved " + fileName);
 }
