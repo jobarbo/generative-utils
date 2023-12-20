@@ -1,6 +1,16 @@
 let noiseCanvasWidth = 1;
 let noiseCanvasHeight = 1;
 
+let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+let smoothstep = (a, b, x) =>
+	((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
+let mix = (a, b, p) => a + p * (b - a);
+let dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
+
+let R = (a = 1) => Math.random() * a;
+let L = (x, y) => (x * x + y * y) ** 0.5; // Elements by Euclid 300 BC
+let k = (a, b) => (a > 0 && b > 0 ? L(a, b) : a > b ? a : b);
+
 // Definitions ===========================================================
 ({sin, cos, imul, PI} = Math);
 TAU = PI * 2;
@@ -151,15 +161,7 @@ const pmap = (v, cl, cm, tl, th, c) =>
 		? Math.min(Math.max(((v - cl) / (cm - cl)) * (th - tl) + tl, tl), th)
 		: ((v - cl) / (cm - cl)) * (th - tl) + tl;
 
-let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
-let smoothstep = (a, b, x) =>
-	((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
-let mix = (a, b, p) => a + p * (b - a);
-let dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
 
-let R = (a = 1) => Math.random() * a;
-let L = (x, y) => (x * x + y * y) ** 0.5; // Elements by Euclid 300 BC
-let k = (a, b) => (a > 0 && b > 0 ? L(a, b) : a > b ? a : b);
 
 let dpi = (maxDPI = 3.0) => {
 	var ua = window.navigator.userAgent;
@@ -181,8 +183,9 @@ let dpi = (maxDPI = 3.0) => {
 function saveCanvas(event) {
 	if (event.key === "s" && (event.metaKey || event.ctrlKey)) {
 		saveArtwork();
-		// Prevent the browser from saving the page
 		event.preventDefault();
+		// Prevent the browser from saving the page
+
 		return false;
 	}
 }
