@@ -163,6 +163,47 @@ const pmap = (v, cl, cm, tl, th, c) =>
 
 
 
+		function sdf_box([x, y], [cx, cy], [w, h]) {
+			x -= cx;
+			y -= cy;
+			return k(abs(x) - w, abs(y) - h);
+		}
+		
+		function sdf_circle([x, y], [cx, cy], r) {
+			x -= cx;
+			y -= cy;
+			return L(x, y) - r;
+		}
+
+		function sdf_hexagon(point, center, size) {
+			const [x, y] = point;
+			const [cx, cy] = center;
+			
+			// Translate the point to the hexagon's local coordinate system
+			const localX = x - cx;
+			const localY = y - cy;
+			
+			// Constants for hexagon calculations
+			const sqrt3 = Math.sqrt(3);
+			const halfSize = size / 2;
+			const sqrt3HalfSize = sqrt3 * halfSize;
+			
+			// Scale and rotate the coordinates to align with the hexagon
+			const rotatedX = (localX - localY / sqrt3) / halfSize;
+			const rotatedY = (localY * 2) / sqrt3 / size;
+			
+			// Calculate distances to the edges of the hexagon
+			const dx = Math.abs(rotatedX);
+			const dy = Math.abs(rotatedY);
+			
+			// Combine distances to create the signed distance
+			const distance = Math.max(dx - 1, dy - 1 / sqrt3);
+			
+			return distance * size;
+	}
+	
+
+
 let dpi = (maxDPI = 3.0) => {
 	var ua = window.navigator.userAgent;
 	var iOS = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i);
