@@ -5,7 +5,15 @@ let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 let smoothstep = (a, b, x) =>
 	((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
 let mix = (a, b, p) => a + p * (b - a);
-let dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
+function dot(v1, v2) {
+	if (v1.length !== 2 || v2.length !== 2) {
+			throw new Error('Both vectors should have exactly 2 elements.');
+	}
+	return v1[0] * v2[0] + v1[1] * v2[1];
+}
+let subtract = (v1, v2) => ({ x: v1.x - v2.x, y: v1.y - v2.y });
+let multiply = (v1, v2) => ({ x: v1.x * v2.x, y: v1.y * v2.y });
+let length = (v) => Math.sqrt(v.x * v.x + v.y * v.y);
 
 let R = (a = 1) => Math.random() * a;
 let L = (x, y) => (x * x + y * y) ** 0.5; // Elements by Euclid 300 BC
@@ -175,32 +183,22 @@ const pmap = (v, cl, cm, tl, th, c) =>
 			return L(x, y) - r;
 		}
 
-		function sdf_hexagon(point, center, size) {
-			const [x, y] = point;
-			const [cx, cy] = center;
-			
-			// Translate the point to the hexagon's local coordinate system
-			const localX = x - cx;
-			const localY = y - cy;
-			
-			// Constants for hexagon calculations
-			const sqrt3 = Math.sqrt(3);
-			const halfSize = size / 2;
-			const sqrt3HalfSize = sqrt3 * halfSize;
-			
-			// Scale and rotate the coordinates to align with the hexagon
-			const rotatedX = (localX - localY / sqrt3) / halfSize;
-			const rotatedY = (localY * 2) / sqrt3 / size;
-			
-			// Calculate distances to the edges of the hexagon
-			const dx = Math.abs(rotatedX);
-			const dy = Math.abs(rotatedY);
-			
-			// Combine distances to create the signed distance
-			const distance = Math.max(dx - 1, dy - 1 / sqrt3);
-			
-			return distance * size;
+		function sdf_hexagon(p, c, r) {
+			// Vector from the center of the hexagon to the point
+			let q = [Math.abs(p[0] - c[0]), Math.abs(p[1] - c[1])];
+	
+			// Rotate the hexagon 30 degrees
+			let rotated = [q[0] * Math.cos(Math.PI / 6) - q[1] * Math.sin(Math.PI / 6), q[0] * Math.sin(Math.PI / 6) + q[1] * Math.cos(Math.PI / 6)];
+	
+			// Calculate the distance to the rotated hexagon
+			let d = Math.max(rotated[1], rotated[0] * 0.5 + rotated[1] * 0.5);
+	
+			// Subtract the radius to get the signed distance
+			let dist = d - r;
+	
+			return dist;
 	}
+	
 	
 
 
