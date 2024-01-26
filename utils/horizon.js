@@ -77,23 +77,20 @@ class VanishingPoint {
 	}
 
 	createLines() {
-		// Calculate the total number of lines and the angle between each line
-		const totalLines = 4 * this.resolution;
-		const angleBetweenLines = 360 / totalLines;
-
-		// For each line
-		for (let i = 0; i < totalLines; i++) {
-			// Calculate the direction vector based on the current angle
-			const currentAngle = i * angleBetweenLines + 45; // Add 45 degrees offset
+		for (let i = 0; i < this.numLines; i++) {
+			// Calculate the direction vector based on the original rotation
+			const currentAngle = i * this.angle + 45; // Add 45 degrees offset
 			this.createVector(currentAngle);
 
-			// Calculate the intersection of the line with the canvas edge
-			const endPoint = this.calculateIntersection();
-			this.end_point_array.push(endPoint);
+			// Calculate the intersection of the line with the canvas boundaries
+			const endPoint = this.calculateCanvasEdge();
+			const endX = endPoint.x;
+			const endY = endPoint.y;
+			// Add the end point to the array
 
-			// If debug is activated, draw the line from the vanishing point to the intersection point
+			// Draw the line
 			if (this._debug) {
-				this.drawLines(endPoint.x, endPoint.y);
+				this.drawLines(endX, endY);
 			}
 		}
 	}
@@ -106,7 +103,7 @@ class VanishingPoint {
 			this.createVector(currentAngle);
 
 			// Calculate the intersection of the line with the canvas edge
-			const endPoint = this.calculateIntersection();
+			const endPoint = this.calculateCanvasEdge();
 			const lineLength = dist(this.x, this.y, endPoint.x, endPoint.y);
 
 			// For each node
@@ -122,39 +119,23 @@ class VanishingPoint {
 		}
 	}
 
-	calculateIntersection() {
-		let x = 0,
-			y = 0;
-
-		if (this.direction.y / this.direction.x > height / width) {
-			// The line intersects with the top or bottom edge of the canvas
-			if (this.direction.y < 0) {
-				// The line intersects with the top edge of the canvas
-				x = this.x - (this.direction.x / this.direction.y) * this.y;
-				y = 0;
-			} else {
-				// The line intersects with the bottom edge of the canvas
-				x = this.x + (this.direction.x / this.direction.y) * (height - this.y);
-				y = height;
-			}
+	calculateCanvasEdge() {
+		let endX, endY;
+		if (abs(this.direction.x) > abs(this.direction.y)) {
+			// If the line is more horizontal than vertical
+			endX = this.direction.x > 0 ? width : 0;
+			endY = this.y + (this.direction.y * (endX - this.x)) / this.direction.x;
 		} else {
-			// The line intersects with the left or right edge of the canvas
-			if (this.direction.x < 0) {
-				// The line intersects with the left edge of the canvas
-				x = 0;
-				y = this.y - (this.direction.y / this.direction.x) * this.x;
-			} else {
-				// The line intersects with the right edge of the canvas
-				x = width;
-				y = this.y + (this.direction.y / this.direction.x) * (width - this.x);
-			}
+			// If the line is more vertical than horizontal
+			endY = this.direction.y > 0 ? height : 0;
+			endX = this.x + (this.direction.x * (endY - this.y)) / this.direction.y;
 		}
+		this.end_point_array.push({x: endX, y: endY});
 
-		return {x: int(x), y: int(y)};
+		return createVector(endX, endY);
 	}
 
 	drawVanishingPoint() {
-		console.log("drawing vanishing point");
 		noFill();
 		stroke(120, 100, 100);
 		line(this.x, this.y - width / 13, this.x, this.y + width / 13);
@@ -168,8 +149,8 @@ class VanishingPoint {
 	drawLines(endX, endY) {
 		stroke(0, 100, 100);
 		line(this.x, this.y, endX, endY);
-		//fill(222, 100, 100);
-		//rect(endX, endY, 30, 30);
+		fill(222, 100, 100);
+		rect(endX, endY, 30, 30);
 	}
 
 	drawNodes() {
@@ -177,6 +158,9 @@ class VanishingPoint {
 			let node = this.node_array[i];
 			fill(0, 100, 100);
 			ellipse(node.x, node.y, 10);
+			// put the index number next to the node
+			fill(0, 100, 100);
+			text(i, node.x + 10, node.y);
 		}
 	}
 }
