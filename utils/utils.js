@@ -2,18 +2,18 @@ let noiseCanvasWidth = 1;
 let noiseCanvasHeight = 1;
 
 let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
-let smoothstep = (a, b, x) =>
-	((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
+let smoothstep = (a, b, x) => (((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
 let mix = (a, b, p) => a + p * (b - a);
 function dot(v1, v2) {
 	if (v1.length !== 2 || v2.length !== 2) {
-			throw new Error('Both vectors should have exactly 2 elements.');
+		throw new Error("Both vectors should have exactly 2 elements.");
 	}
 	return v1[0] * v2[0] + v1[1] * v2[1];
 }
-let subtract = (v1, v2) => ({ x: v1.x - v2.x, y: v1.y - v2.y });
-let multiply = (v1, v2) => ({ x: v1.x * v2.x, y: v1.y * v2.y });
+let subtract = (v1, v2) => ({x: v1.x - v2.x, y: v1.y - v2.y});
+let multiply = (v1, v2) => ({x: v1.x * v2.x, y: v1.y * v2.y});
 let length = (v) => Math.sqrt(v.x * v.x + v.y * v.y);
+let randomInt = (max) => Math.floor(Math.random() * max);
 
 let R = (a = 1) => Math.random() * a;
 let L = (x, y) => (x * x + y * y) ** 0.5; // Elements by Euclid 300 BC
@@ -29,25 +29,14 @@ F = (N, f) => [...Array(N)].map((_, i) => f(i)); // for loop / map / list functi
 //seed = Math.random() * 2 ** 32;
 
 S = Uint32Array.of(9, 7, 5, 3); // PRNG state
-R = (a = 1) =>
-	a *
-	((a = S[3]),
-	(S[3] = S[2]),
-	(S[2] = S[1]),
-	(a ^= a << 11),
-	(S[0] ^= a ^ (a >>> 8) ^ ((S[1] = S[0]) >>> 19)),
-	S[0] / 2 ** 32); // random function
-[...(seed + 'ThxPiter')].map((c) => R((S[3] ^= c.charCodeAt() * 23205))); // seeding the random function
+R = (a = 1) => a * ((a = S[3]), (S[3] = S[2]), (S[2] = S[1]), (a ^= a << 11), (S[0] ^= a ^ (a >>> 8) ^ ((S[1] = S[0]) >>> 19)), S[0] / 2 ** 32); // random function
+[...(seed + "ThxPiter")].map((c) => R((S[3] ^= c.charCodeAt() * 23205))); // seeding the random function
 
 // general noise definitions =============================================
 KNUTH = 0x9e3779b1; // prime number close to PHI * 2 ** 32
 NSEED = R(2 ** 32); // noise seed, random 32 bit integer
 // 3d noise grid function
-ri = (i, j, k) => (
-	(i = imul((((i & 1023) << 20) | ((j & 1023) << 10) | ((i ^ j ^ k) & 1023)) ^ NSEED, KNUTH)),
-	(i <<= 3 + (i >>> 29)),
-	(i >>> 1) / 2 ** 31 - 0.5
-);
+ri = (i, j, k) => ((i = imul((((i & 1023) << 20) | ((j & 1023) << 10) | ((i ^ j ^ k) & 1023)) ^ NSEED, KNUTH)), (i <<= 3 + (i >>> 29)), (i >>> 1) / 2 ** 31 - 0.5);
 
 // 3D value noise function ===============================================
 no = F(99, (_) => R(1024)); // random noise offsets
@@ -93,33 +82,18 @@ n2 = (
 	i,
 	c = nc[i] * s,
 	n = ns[i] * s,
-	xi = floor(
-		(([x, y] = [
-			(x - noiseCanvasWidth / 2) * c + (y - noiseCanvasHeight * 2) * n + nox[i],
-			(y - noiseCanvasHeight * 2) * c - (x - noiseCanvasWidth / 2) * n + noy[i],
-		]),
-		x)
-	),
+	xi = floor((([x, y] = [(x - noiseCanvasWidth / 2) * c + (y - noiseCanvasHeight * 2) * n + nox[i], (y - noiseCanvasHeight * 2) * c - (x - noiseCanvasWidth / 2) * n + noy[i]]), x)),
 	yi = floor(y) // (x,y) = coordinate, s = scale, i = noise offset index
 ) => (
 	(x -= xi),
 	(y -= yi),
 	(x *= x * (3 - 2 * x)),
 	(y *= y * (3 - 2 * y)),
-	ri(xi, yi, i) * (1 - x) * (1 - y) +
-		ri(xi, yi + 1, i) * (1 - x) * y +
-		ri(xi + 1, yi, i) * x * (1 - y) +
-		ri(xi + 1, yi + 1, i) * x * y
+	ri(xi, yi, i) * (1 - x) * (1 - y) + ri(xi, yi + 1, i) * (1 - x) * y + ri(xi + 1, yi, i) * x * (1 - y) + ri(xi + 1, yi + 1, i) * x * y
 );
 
 //! Spell formula from Piter The Mage
-ZZ = (x, m, b, r) =>
-	x < 0
-		? x
-		: x > (b *= r * 4)
-		? x - b
-		: ((x /= r), fract(x / 4) < 0.5 ? r : -r) *
-		  ((x = abs(fract(x / 2) - 0.5)), 1 - (x > m ? x * 2 : x * (x /= m) * x * (2 - x) + m));
+ZZ = (x, m, b, r) => (x < 0 ? x : x > (b *= r * 4) ? x - b : ((x /= r), fract(x / 4) < 0.5 ? r : -r) * ((x = abs(fract(x / 2) - 0.5)), 1 - (x > m ? x * 2 : x * (x /= m) * x * (2 - x) + m)));
 
 // the point of all the previous code is that now you have a very
 // fast value noise function called nz(x,y,s,i). It has four parameters:
@@ -161,46 +135,36 @@ function weighted_choice(data) {
 	return data[data.length - 1][0];
 }
 
-let mapValue = (v, s, S, a, b) => (
-	(v = Math.min(Math.max(v, s), S)), ((v - s) * (b - a)) / (S - s) + a
-);
-const pmap = (v, cl, cm, tl, th, c) =>
-	c
-		? Math.min(Math.max(((v - cl) / (cm - cl)) * (th - tl) + tl, tl), th)
-		: ((v - cl) / (cm - cl)) * (th - tl) + tl;
+let mapValue = (v, s, S, a, b) => ((v = Math.min(Math.max(v, s), S)), ((v - s) * (b - a)) / (S - s) + a);
+const pmap = (v, cl, cm, tl, th, c) => (c ? Math.min(Math.max(((v - cl) / (cm - cl)) * (th - tl) + tl, tl), th) : ((v - cl) / (cm - cl)) * (th - tl) + tl);
 
+function sdf_box([x, y], [cx, cy], [w, h]) {
+	x -= cx;
+	y -= cy;
+	return k(abs(x) - w, abs(y) - h);
+}
 
+function sdf_circle([x, y], [cx, cy], r) {
+	x -= cx;
+	y -= cy;
+	return L(x, y) - r;
+}
 
-		function sdf_box([x, y], [cx, cy], [w, h]) {
-			x -= cx;
-			y -= cy;
-			return k(abs(x) - w, abs(y) - h);
-		}
-		
-		function sdf_circle([x, y], [cx, cy], r) {
-			x -= cx;
-			y -= cy;
-			return L(x, y) - r;
-		}
+function sdf_hexagon(p, c, r) {
+	// Vector from the center of the hexagon to the point
+	let q = [Math.abs(p[0] - c[0]), Math.abs(p[1] - c[1])];
 
-		function sdf_hexagon(p, c, r) {
-			// Vector from the center of the hexagon to the point
-			let q = [Math.abs(p[0] - c[0]), Math.abs(p[1] - c[1])];
-	
-			// Rotate the hexagon 30 degrees
-			let rotated = [q[0] * Math.cos(Math.PI / 6) - q[1] * Math.sin(Math.PI / 6), q[0] * Math.sin(Math.PI / 6) + q[1] * Math.cos(Math.PI / 6)];
-	
-			// Calculate the distance to the rotated hexagon
-			let d = Math.max(rotated[1], rotated[0] * 0.5 + rotated[1] * 0.5);
-	
-			// Subtract the radius to get the signed distance
-			let dist = d - r;
-	
-			return dist;
-	}
-	
-	
+	// Rotate the hexagon 30 degrees
+	let rotated = [q[0] * Math.cos(Math.PI / 6) - q[1] * Math.sin(Math.PI / 6), q[0] * Math.sin(Math.PI / 6) + q[1] * Math.cos(Math.PI / 6)];
 
+	// Calculate the distance to the rotated hexagon
+	let d = Math.max(rotated[1], rotated[0] * 0.5 + rotated[1] * 0.5);
+
+	// Subtract the radius to get the signed distance
+	let dist = d - r;
+
+	return dist;
+}
 
 let dpi = (maxDPI = 3.0) => {
 	var ua = window.navigator.userAgent;
@@ -220,12 +184,12 @@ let dpi = (maxDPI = 3.0) => {
 
 // if cmd + s is pressed, save the canvas'
 function saveCanvas(event) {
-	console.log('saveCanvas function called');
+	console.log("saveCanvas function called");
 	if (event.key === "s" && (event.metaKey || event.ctrlKey)) {
-			console.log('Save shortcut detected');
-			saveArtwork();
-			event.preventDefault();
-			return false;
+		console.log("Save shortcut detected");
+		saveArtwork();
+		event.preventDefault();
+		return false;
 	}
 }
 
@@ -237,19 +201,10 @@ function saveArtwork() {
 	var dom_spin = document.querySelector(".spin-container");
 	var canvas = document.getElementById("defaultCanvas0");
 	var d = new Date();
-	var datestring =
-		d.getDate() +
-		"_" +
-		`${d.getMonth() + 1}` +
-		"_" +
-		d.getFullYear() +
-		"_" +
-		`${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
+	var datestring = d.getDate() + "_" + `${d.getMonth() + 1}` + "_" + d.getFullYear() + "_" + `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
 	console.log(canvas);
 	var fileName = datestring + ".png";
-	const imageUrl = canvas
-		.toDataURL("image/png")
-		.replace("image/png", "image/octet-stream");
+	const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
 	const a = document.createElement("a");
 	a.href = imageUrl;
 	a.setAttribute("download", fileName);
@@ -258,7 +213,6 @@ function saveArtwork() {
 	//dom_spin.classList.remove("active");
 	console.log("saved " + fileName);
 }
-
 
 // url search params
 const sp = new URLSearchParams(window.location.search);
