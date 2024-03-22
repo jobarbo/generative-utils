@@ -199,9 +199,11 @@ document.addEventListener("keydown", saveCanvas);
 // make a function to save the canvas as a png file with the git branch name and a timestamp
 function saveArtwork() {
 	var dom_spin = document.querySelector(".spin-container");
+	var output_hash = fxhash;
+	console.log(output_hash);
 	var canvas = document.getElementById("defaultCanvas0");
 	var d = new Date();
-	var datestring = `${d.getMonth() + 1}` + "_" + d.getDate() + "_" + d.getFullYear() + "_" + `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
+	var datestring = `${d.getMonth() + 1}` + "_" + d.getDate() + "_" + d.getFullYear() + "_" + `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}_${fxhash}`;
 	console.log(canvas);
 	var fileName = datestring + ".png";
 	const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
