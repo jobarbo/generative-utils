@@ -263,41 +263,46 @@ function createAnimationGenerator(config) {
 	let framesRendered = 0;
 	let renderStart = Date.now();
 	let drawing = true;
+	let totalOperations = items.length * maxFrames;
+	let operationsCompleted = 0;
 
 	function* animationGenerator() {
 		let count = 0;
 		let frameCount = 0;
 
-		while (true) {
+		while (drawing) {
 			for (let i = 0; i < items.length; i++) {
 				const item = items[i];
 				renderItem(item);
 				moveItem(item, elapsedTime, maxFrames);
+				operationsCompleted++;
 
 				if (count > cycleLength) {
 					count = 0;
+					// Calculate progress based on total operations instead of just frames
+					let progress = (operationsCompleted / totalOperations) * maxFrames;
+					showLoadingBar(progress, maxFrames, renderStart, framesRendered);
+
+					// Check if we've reached 100%
+					if (progress >= maxFrames) {
+						drawing = false;
+						if (onComplete) {
+							onComplete();
+						}
+						return;
+					}
+
 					yield;
 				}
 				count++;
 			}
 
 			elapsedTime = frameCount - startTime;
-			showLoadingBar(elapsedTime, maxFrames, renderStart, framesRendered);
-
 			frameCount++;
 			framesRendered++;
-
-			if (elapsedTime > maxFrames && drawing) {
-				drawing = false;
-				if (onComplete) {
-					onComplete();
-				}
-				return;
-			}
 		}
 	}
 
-	// Return the generator instance instead of the generator function
 	return animationGenerator();
 }
 
@@ -316,4 +321,44 @@ function startAnimation(generator) {
 
 	animate();
 	return animation;
+}
+
+/**
+ * A simple timer utility for measuring execution time
+ */
+class ExecutionTimer {
+	constructor() {
+		this.startTime = null;
+		this.endTime = null;
+	}
+
+	start() {
+		this.startTime = Date.now();
+		return this;
+	}
+
+	stop() {
+		this.endTime = Date.now();
+		return this;
+	}
+
+	getElapsedTime() {
+		if (!this.startTime) {
+			console.warn("Timer was not started");
+			return 0;
+		}
+		const endTime = this.endTime || Date.now();
+		return (endTime - this.startTime) / 1000; // Convert to seconds
+	}
+
+	logElapsedTime(message = "Execution completed in") {
+		console.log(`${message} ${this.getElapsedTime().toFixed(2)} seconds`);
+		return this;
+	}
+
+	reset() {
+		this.startTime = null;
+		this.endTime = null;
+		return this;
+	}
 }
