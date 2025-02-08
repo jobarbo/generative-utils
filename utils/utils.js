@@ -218,3 +218,102 @@ function saveArtwork() {
 
 // url search params
 const sp = new URLSearchParams(window.location.search);
+
+/**
+ * Shows a loading bar with progress and time estimation
+ * @param {number} elapsedTime - Current elapsed time
+ * @param {number} maxFrames - Total number of frames
+ * @param {number} renderStart - Timestamp when rendering started
+ * @param {number} framesRendered - Number of frames rendered so far
+ */
+function showLoadingBar(elapsedTime, maxFrames, renderStart, framesRendered) {
+	let currentTime = Date.now();
+	let totalElapsedTime = currentTime - renderStart;
+
+	let percent = (elapsedTime / maxFrames) * 100;
+	if (percent > 100) percent = 100;
+
+	let averageFrameTime = totalElapsedTime / framesRendered;
+	let remainingFrames = maxFrames - framesRendered;
+	let estimatedTimeRemaining = averageFrameTime * remainingFrames;
+
+	// Convert milliseconds to seconds
+	let timeLeftSec = Math.round(estimatedTimeRemaining / 1000);
+
+	// put the percent in the title of the page
+	document.title = percent.toFixed(0) + "% - Time left : " + timeLeftSec + "s";
+}
+
+/**
+ * Creates a generator function for animation rendering
+ * @param {Object} config - Configuration object
+ * @param {Array} config.items - Array of items to animate
+ * @param {number} config.maxFrames - Maximum number of frames to render
+ * @param {number} config.startTime - Starting frame count
+ * @param {number} config.cycleLength - Number of items to process before yielding
+ * @param {Function} config.renderItem - Function to render a single item
+ * @param {Function} config.moveItem - Function to update item position
+ * @param {Function} config.onComplete - Callback when animation is complete
+ * @returns {Generator} A generator function that handles the animation
+ */
+function createAnimationGenerator(config) {
+	const {items, maxFrames, startTime, cycleLength, renderItem, moveItem, onComplete} = config;
+
+	let elapsedTime = 0;
+	let framesRendered = 0;
+	let renderStart = Date.now();
+	let drawing = true;
+
+	function* animationGenerator() {
+		let count = 0;
+		let frameCount = 0;
+
+		while (true) {
+			for (let i = 0; i < items.length; i++) {
+				const item = items[i];
+				renderItem(item);
+				moveItem(item, elapsedTime, maxFrames);
+
+				if (count > cycleLength) {
+					count = 0;
+					yield;
+				}
+				count++;
+			}
+
+			elapsedTime = frameCount - startTime;
+			showLoadingBar(elapsedTime, maxFrames, renderStart, framesRendered);
+
+			frameCount++;
+			framesRendered++;
+
+			if (elapsedTime > maxFrames && drawing) {
+				drawing = false;
+				if (onComplete) {
+					onComplete();
+				}
+				return;
+			}
+		}
+	}
+
+	// Return the generator instance instead of the generator function
+	return animationGenerator();
+}
+
+/**
+ * Starts an animation loop using a generator
+ * @param {Generator} generator - The animation generator instance
+ * @returns {number} The animation timeout ID
+ */
+function startAnimation(generator) {
+	let animation;
+
+	function animate() {
+		animation = setTimeout(animate, 0);
+		generator.next();
+	}
+
+	animate();
+	return animation;
+}
