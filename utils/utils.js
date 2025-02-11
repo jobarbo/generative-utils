@@ -265,16 +265,16 @@ function createAnimationGenerator(config) {
 	let drawing = true;
 	let totalOperations = items.length * maxFrames;
 	let operationsCompleted = 0;
+	let currentFrame = 0;
 
 	function* animationGenerator() {
 		let count = 0;
-		let frameCount = 0;
 
 		while (drawing) {
 			for (let i = 0; i < items.length; i++) {
 				const item = items[i];
-				renderItem(item);
-				moveItem(item, elapsedTime, maxFrames);
+				renderItem(item, currentFrame);
+				moveItem(item, currentFrame);
 				operationsCompleted++;
 
 				if (count > cycleLength) {
@@ -297,8 +297,8 @@ function createAnimationGenerator(config) {
 				count++;
 			}
 
-			elapsedTime = frameCount - startTime;
-			frameCount++;
+			currentFrame++;
+			elapsedTime = currentFrame;
 			framesRendered++;
 		}
 	}
