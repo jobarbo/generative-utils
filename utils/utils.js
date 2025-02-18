@@ -195,6 +195,26 @@ function saveCanvas(event) {
 
 // Example usage to add an event listener for key presses
 document.addEventListener("keydown", saveCanvas);
+document.addEventListener("keydown", toggleGuides);
+
+// Function to toggle guide lines visibility
+function toggleGuides(event) {
+	// Toggle guides when 'g' key is pressed
+	if (event.key === "g") {
+		let guideContainer = document.querySelector(".guide-container");
+
+		// Create guide container if it doesn't exist
+		if (!guideContainer) {
+			guideContainer = document.createElement("span");
+			guideContainer.className = "guide-container";
+			document.querySelector("main").appendChild(guideContainer);
+		}
+
+		// Toggle the show class
+		guideContainer.classList.toggle("show");
+		console.log("Guides toggled");
+	}
+}
 
 // make a function to save the canvas as a png file with the git branch name and a timestamp
 function saveArtwork() {
