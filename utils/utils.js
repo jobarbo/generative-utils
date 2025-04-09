@@ -236,6 +236,14 @@ function saveArtwork() {
 	console.log("saved " + fileName);
 }
 
+function max(a, b) {
+	return a > b ? a : b;
+}
+
+function min(a, b) {
+	return a < b ? a : b;
+}
+
 // url search params
 const sp = new URLSearchParams(window.location.search);
 
