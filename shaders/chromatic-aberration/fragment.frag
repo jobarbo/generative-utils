@@ -25,8 +25,8 @@ void main() {
     // Wave distortion
 /*     float waveX = sin(uv.x * 100.0 + uTime) * tan(0.0025);
     float waveY = cos(uv.y * 100.0 - uTime) * tan(0.0025); */
-    float waveX = tan(uv.y * 45.0 ) * tan(0.015);
-    float waveY = tan(uv.x * 45.0 ) * tan(0.015);
+    float waveX = tan(uv.y * 45.0 ) * tan(0.0075);
+    float waveY = tan(uv.x * 45.0 ) * tan(0.0075);
     vec2 waveOffset = vec2(waveX, waveY);
 
     // Sample the original image at the center position
