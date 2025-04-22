@@ -138,10 +138,23 @@ function weighted_choice(data) {
 let mapValue = (v, s, S, a, b) => ((v = Math.min(Math.max(v, s), S)), ((v - s) * (b - a)) / (S - s) + a);
 const pmap = (v, cl, cm, tl, th, c) => (c ? Math.min(Math.max(((v - cl) / (cm - cl)) * (th - tl) + tl, tl), th) : ((v - cl) / (cm - cl)) * (th - tl) + tl);
 
-function sdf_box([x, y], [cx, cy], [w, h]) {
+function sdf_box([x, y], [cx, cy], [w, h], r = 0) {
 	x -= cx;
 	y -= cy;
-	return k(abs(x) - w, abs(y) - h);
+
+	// Use the original calculation for sharp corners when r is 0
+	if (r === 0) {
+		return k(abs(x) - w, abs(y) - h);
+	}
+
+	// Calculate the distance with border radius
+	let dx = abs(x) - w + r;
+	let dy = abs(y) - h + r;
+	// External distance
+	let external = L(max(dx, 0), max(dy, 0)) - r;
+	// Internal distance
+	let internal = min(max(dx, dy), 0);
+	return external + internal;
 }
 
 function sdf_circle([x, y], [cx, cy], r) {
