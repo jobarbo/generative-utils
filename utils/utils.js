@@ -281,8 +281,18 @@ function showLoadingBar(elapsedTime, maxFrames, renderStart, framesRendered) {
 	// Convert milliseconds to seconds
 	let timeLeftSec = Math.round(estimatedTimeRemaining / 1000);
 
+	// Format time display
+	let timeDisplay;
+	if (timeLeftSec > 60) {
+		let minutes = Math.floor(timeLeftSec / 60);
+		let seconds = timeLeftSec % 60;
+		timeDisplay = `${minutes}m ${seconds}s`;
+	} else {
+		timeDisplay = `${timeLeftSec}s`;
+	}
+
 	// put the percent in the title of the page
-	document.title = percent.toFixed(0) + "% - Time left : " + timeLeftSec + "s";
+	document.title = percent.toFixed(0) + "% - Time left : " + timeDisplay;
 }
 
 /**
