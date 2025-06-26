@@ -249,7 +249,9 @@ class LibManager {
 	async loadEssentials() {
 		console.log("🚀 Loading essential modules...");
 		await this.loadModules(["fxhash", "p5", "spectral", "logs", "utils", "params", "mover"]);
-		console.log("✅ All essential modules loaded!");
+		// Use Logger if available, otherwise fallback to console
+		const logger = window.Logger || console;
+		logger.success ? logger.success("All essential modules loaded!") : console.log("✅ All essential modules loaded!");
 	}
 
 	/**
@@ -258,7 +260,9 @@ class LibManager {
 	async loadUtils() {
 		console.log("🔧 Loading utility modules...");
 		await this.loadModules(["logs", "utils", "memory", "animation", "shader", "smudge", "horizon", "knob"]);
-		console.log("✅ All utility modules loaded!");
+		// Use Logger if available, otherwise fallback to console
+		const logger = window.Logger || console;
+		logger.success ? logger.success("All utility modules loaded!") : console.log("✅ All utility modules loaded!");
 	}
 
 	/**
@@ -272,10 +276,11 @@ class LibManager {
 	 * Debug info
 	 */
 	debug() {
-		console.log("🔍 LibManager Debug Info:");
-		console.log("Loaded modules:", this.getLoadedModules());
-		console.log("Available modules:", Object.keys(this.modulePaths));
-		console.log("Dependencies:", Object.fromEntries(this.dependencies));
+		const logger = window.Logger || console;
+		logger.header ? logger.header("LibManager Debug Info") : console.log("🔍 LibManager Debug Info:");
+		logger.table ? logger.table("Loaded Modules", this.getLoadedModules()) : console.log("Loaded modules:", this.getLoadedModules());
+		logger.table ? logger.table("Available Modules", Object.keys(this.modulePaths)) : console.log("Available modules:", Object.keys(this.modulePaths));
+		logger.table ? logger.table("Dependencies", Object.fromEntries(this.dependencies)) : console.log("Dependencies:", Object.fromEntries(this.dependencies));
 	}
 }
 

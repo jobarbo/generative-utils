@@ -42,6 +42,11 @@ const Logger = {
 		if (data) console.log(data);
 	},
 
+	table(title, data) {
+		console.log(`%c📊 ${title}`, this.styles.info);
+		console.table(data);
+	},
+
 	// Specialized logging methods
 	animation: {
 		progress(current, total, extra = "") {

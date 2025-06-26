@@ -197,9 +197,10 @@ let dpi = (maxDPI = 3.0) => {
 
 // if cmd + s is pressed, save the canvas'
 function saveCanvas(event) {
-	console.log("saveCanvas function called");
+	const logger = window.Logger || console;
+	logger.debug ? logger.debug("saveCanvas function called") : logger.log("saveCanvas function called");
 	if (event.key === "s" && (event.metaKey || event.ctrlKey)) {
-		console.log("Save shortcut detected");
+		logger.info ? logger.info("Save shortcut detected") : logger.log("Save shortcut detected");
 		saveArtwork();
 		event.preventDefault();
 		return false;
@@ -225,19 +226,21 @@ function toggleGuides(event) {
 
 		// Toggle the show class
 		guideContainer.classList.toggle("show");
-		console.log("Guides toggled");
+		const logger = window.Logger || console;
+		logger.info ? logger.info("Guides toggled") : logger.log("Guides toggled");
 	}
 }
 
 // make a function to save the canvas as a png file with the git branch name and a timestamp
 function saveArtwork() {
+	const logger = window.Logger || console;
 	var dom_spin = document.querySelector(".spin-container");
 	var output_hash = fxhash;
-	console.log(output_hash);
+	logger.debug ? logger.debug("Hash for save: " + output_hash) : logger.log("Hash for save:", output_hash);
 	var canvas = document.getElementById("defaultCanvas0");
 	var d = new Date();
 	var datestring = `${d.getMonth() + 1}` + "_" + d.getDate() + "_" + d.getFullYear() + "_" + `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}_${fxhash}`;
-	console.log(canvas);
+	logger.debug ? logger.debug("Canvas element: " + (canvas ? "Found" : "Not found")) : logger.log("Canvas element:", canvas);
 	var fileName = datestring + ".png";
 	const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
 	const a = document.createElement("a");
@@ -246,7 +249,7 @@ function saveArtwork() {
 	a.click();
 
 	//dom_spin.classList.remove("active");
-	console.log("saved " + fileName);
+	logger.success ? logger.success("Saved " + fileName) : logger.log("saved " + fileName);
 }
 
 function max(a, b) {
@@ -395,7 +398,8 @@ class ExecutionTimer {
 
 	getElapsedTime() {
 		if (!this.startTime) {
-			console.warn("Timer was not started");
+			const logger = window.Logger || console;
+			logger.warning ? logger.warning("Timer was not started") : logger.warn("Timer was not started");
 			return 0;
 		}
 		const endTime = this.endTime || Date.now();
@@ -403,7 +407,8 @@ class ExecutionTimer {
 	}
 
 	logElapsedTime(message = "Execution completed in") {
-		console.log(`${message} ${this.getElapsedTime().toFixed(2)} seconds`);
+		const logger = window.Logger || console;
+		logger.info ? logger.info(`${message} ${this.getElapsedTime().toFixed(2)} seconds`) : logger.log(`${message} ${this.getElapsedTime().toFixed(2)} seconds`);
 		return this;
 	}
 
