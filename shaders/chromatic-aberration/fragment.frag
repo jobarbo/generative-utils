@@ -6,6 +6,42 @@ uniform sampler2D uTexture;
 uniform float uTime;
 uniform vec2 uResolution;
 
+// Simple 2D noise function
+float random(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
+// 2D Noise based on Morgan McGuire @morgan3d
+float noise(vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
+
+    // Four corners in 2D of a tile
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+
+    vec2 u = f * f * (3.0 - 2.0 * f);
+
+    return mix(a, b, u.x) +
+           (c - a) * u.y * (1.0 - u.x) +
+           (d - b) * u.x * u.y;
+}
+
+// Fractal Brownian Motion for more complex noise
+float fbm(vec2 st) {
+    float value = 0.0;
+    float amplitude = 0.5;
+
+    for (int i = 0; i < 4; i++) {
+        value += amplitude * noise(st);
+        st *= 2.0;
+        amplitude *= 0.5;
+    }
+    return value;
+}
+
 void main() {
     vec2 uv = vTexCoord;
 
@@ -33,16 +69,20 @@ void main() {
     vec4 originalColor = texture2D(uTexture, uv);
 
     // Chromatic aberration - noisy, organic effect
-    float aberrationAmount = 0.0003;
+    float aberrationAmount = 0.003; // Increased for more visible effect
 
-    // Create noise-based direction vectors
-    float noiseScale = 8.0;
-    float noiseX = sin(uv.x * noiseScale + uTime) * cos(uv.y * noiseScale + uTime * 0.7);
-    float noiseY = cos(uv.x * noiseScale + uTime * 0.5) * sin(uv.y * noiseScale + uTime * 0.3);
+    // Create noise-based direction vectors using proper noise functions
+    float noiseScale = 6.0;
+    vec2 noiseCoord = uv * noiseScale + uTime * 0.2;
 
-    // Create varying aberration intensity based on noise
-    float noiseIntensity = (sin(uv.x * 15.0 + uTime * 2.0) + cos(uv.y * 12.0 + uTime * 1.5)) * 10.25;
-    float scaledAberration = aberrationAmount * (0.5 + noiseIntensity * 0.5);
+    // Generate directional noise for X and Y
+    float noiseX = fbm(noiseCoord) * 2.0 - 1.0; // Convert from [0,1] to [-1,1]
+    float noiseY = fbm(noiseCoord + vec2(100.0, 100.0)) * 2.0 - 1.0; // Offset for different pattern
+
+    // Create varying aberration intensity using layered noise
+    vec2 intensityCoord = uv * 10.0 + uTime * 0.1;
+    float noiseIntensity = fbm(intensityCoord);
+    float scaledAberration = aberrationAmount * (0.5 + noiseIntensity * 1.5);
 
     // Apply noise-based directional offsets
     vec2 redOffset = uv + waveOffset + vec2(noiseX, noiseY) * scaledAberration;
