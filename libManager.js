@@ -1,0 +1,289 @@
+/**
+ * BUBBLE-CHAMBER Library Manager
+ * Modular library system for managing dependencies and imports
+ */
+
+class LibManager {
+	constructor() {
+		this.modules = new Map();
+		this.loadedModules = new Set();
+		this.dependencies = new Map();
+		this.loadPromises = new Map();
+		this.globalVarsBackup = new Map();
+
+		// Define module paths
+		this.modulePaths = {
+			// Utility modules
+			utils: "./library/utils/utils.js",
+			logs: "./library/utils/logs.js",
+			memory: "./library/utils/memoryManager.js",
+			animation: "./library/utils/animationController.js",
+			shader: "./library/utils/shaderManager.js",
+			smudge: "./library/utils/smudge.js",
+			horizon: "./library/utils/horizon.js",
+			knob: "./library/utils/knob.js",
+
+			// Core libraries
+			fxhash: "./library/utils/fxhash.js",
+			p5: "./library/p5/p5.min.js",
+			spectral: "./library/p5/spectral.js",
+
+			// Application modules
+			params: "./parameters/params.js",
+			mover: "./object/mover.js",
+		};
+
+		// Define dependencies (what each module needs)
+		this.dependencies.set("utils", ["logs"]); // utils needs Logger from logs
+		this.dependencies.set("mover", ["utils", "logs"]);
+		this.dependencies.set("animation", ["logs", "memory"]);
+		this.dependencies.set("shader", ["logs"]);
+		this.dependencies.set("params", ["fxhash"]); // params needs fxhash
+
+		// Global exports for each module
+		this.moduleExports = new Map();
+	}
+
+	/**
+	 * Backup a global variable before it might be overwritten
+	 */
+	backupGlobalVar(varName) {
+		if (window[varName] !== undefined && !this.globalVarsBackup.has(varName)) {
+			this.globalVarsBackup.set(varName, window[varName]);
+		}
+	}
+
+	/**
+	 * Restore a global variable from backup
+	 */
+	restoreGlobalVar(varName) {
+		if (this.globalVarsBackup.has(varName)) {
+			window[varName] = this.globalVarsBackup.get(varName);
+		}
+	}
+
+	/**
+	 * Load a script dynamically
+	 */
+	async loadScript(src) {
+		if (this.loadPromises.has(src)) {
+			return this.loadPromises.get(src);
+		}
+
+		const promise = new Promise((resolve, reject) => {
+			// Check if script is already loaded
+			const existingScript = document.querySelector(`script[src="${src}"]`);
+			if (existingScript) {
+				console.log(`⚡ Already loaded: ${src}`);
+				resolve();
+				return;
+			}
+
+			const script = document.createElement("script");
+			script.src = src;
+			script.onload = () => {
+				console.log(`✓ Loaded: ${src}`);
+				resolve();
+			};
+			script.onerror = () => {
+				console.error(`✗ Failed to load: ${src}`);
+				reject(new Error(`Failed to load script: ${src}`));
+			};
+			document.head.appendChild(script);
+		});
+
+		this.loadPromises.set(src, promise);
+		return promise;
+	}
+
+	/**
+	 * Load a module and its dependencies
+	 */
+	async loadModule(moduleName) {
+		if (this.loadedModules.has(moduleName)) {
+			return this.modules.get(moduleName);
+		}
+
+		// Load dependencies first
+		const deps = this.dependencies.get(moduleName) || [];
+		for (const dep of deps) {
+			await this.loadModule(dep);
+		}
+
+		// Handle special cases before loading
+		if (moduleName === "mover") {
+			this.backupGlobalVar("Mover");
+		}
+
+		// Load the module itself
+		const modulePath = this.modulePaths[moduleName];
+		if (!modulePath) {
+			throw new Error(`Unknown module: ${moduleName}`);
+		}
+
+		await this.loadScript(modulePath);
+		this.loadedModules.add(moduleName);
+
+		// Extract and store module exports based on the module type
+		this.extractModuleExports(moduleName);
+
+		return this.modules.get(moduleName);
+	}
+
+	/**
+	 * Extract exports from loaded modules
+	 */
+	extractModuleExports(moduleName) {
+		switch (moduleName) {
+			case "logs":
+				this.modules.set(moduleName, {
+					Logger: window.Logger,
+					generateConsoleLogs: window.generateConsoleLogs,
+				});
+				break;
+
+			case "utils":
+				// Extract utility functions from global scope
+				this.modules.set(moduleName, {
+					clamp: window.clamp,
+					smoothstep: window.smoothstep,
+					mix: window.mix,
+					dot: window.dot,
+					subtract: window.subtract,
+					multiply: window.multiply,
+					length: window.length,
+					randomInt: window.randomInt,
+					R: window.R,
+					L: window.L,
+					k: window.k,
+					oct: window.oct,
+					weighted_choice: window.weighted_choice,
+					mapValue: window.mapValue,
+					pmap: window.pmap,
+					sdf_box: window.sdf_box,
+					sdf_circle: window.sdf_circle,
+					sdf_hexagon: window.sdf_hexagon,
+					dpi: window.dpi,
+					saveCanvas: window.saveCanvas,
+					toggleGuides: window.toggleGuides,
+					saveArtwork: window.saveArtwork,
+					max: window.max,
+					min: window.min,
+					showLoadingBar: window.showLoadingBar,
+					createAnimationGenerator: window.createAnimationGenerator,
+					startAnimation: window.startAnimation,
+					ExecutionTimer: window.ExecutionTimer,
+				});
+				break;
+
+			case "memory":
+				this.modules.set(moduleName, {
+					MemoryManager: window.MemoryManager,
+				});
+				break;
+
+			case "animation":
+				this.modules.set(moduleName, {
+					AnimationController: window.AnimationController,
+				});
+				break;
+
+			case "mover":
+				this.modules.set(moduleName, {
+					Mover: window.Mover,
+				});
+				break;
+
+			case "params":
+				this.modules.set(moduleName, {
+					features: window.features || {},
+					generate_composition_params: window.generate_composition_params,
+					fxhash: window.fxhash,
+					fxrand: window.fxrand,
+					fx: window.fx,
+				});
+				break;
+
+			case "fxhash":
+				this.modules.set(moduleName, {
+					fxhash: window.fxhash || window.$fx?.hash,
+					fxrand: window.fxrand || window.$fx?.rand,
+					fx: window.$fx,
+				});
+				break;
+
+			default:
+				// For other modules, just mark as loaded
+				this.modules.set(moduleName, {});
+		}
+	}
+
+	/**
+	 * Get a loaded module
+	 */
+	get(moduleName) {
+		if (!this.loadedModules.has(moduleName)) {
+			throw new Error(`Module '${moduleName}' not loaded. Call loadModule('${moduleName}') first.`);
+		}
+		return this.modules.get(moduleName);
+	}
+
+	/**
+	 * Check if a module is loaded
+	 */
+	isLoaded(moduleName) {
+		return this.loadedModules.has(moduleName);
+	}
+
+	/**
+	 * Load multiple modules at once
+	 */
+	async loadModules(moduleNames) {
+		const promises = moduleNames.map((name) => this.loadModule(name));
+		return Promise.all(promises);
+	}
+
+	/**
+	 * Load essential modules for the sketch
+	 */
+	async loadEssentials() {
+		console.log("🚀 Loading essential modules...");
+		await this.loadModules(["fxhash", "p5", "spectral", "logs", "utils", "params", "mover"]);
+		console.log("✅ All essential modules loaded!");
+	}
+
+	/**
+	 * Load utility modules
+	 */
+	async loadUtils() {
+		console.log("🔧 Loading utility modules...");
+		await this.loadModules(["logs", "utils", "memory", "animation", "shader", "smudge", "horizon", "knob"]);
+		console.log("✅ All utility modules loaded!");
+	}
+
+	/**
+	 * Get list of loaded modules
+	 */
+	getLoadedModules() {
+		return Array.from(this.loadedModules);
+	}
+
+	/**
+	 * Debug info
+	 */
+	debug() {
+		console.log("🔍 LibManager Debug Info:");
+		console.log("Loaded modules:", this.getLoadedModules());
+		console.log("Available modules:", Object.keys(this.modulePaths));
+		console.log("Dependencies:", Object.fromEntries(this.dependencies));
+	}
+}
+
+// Create global instance
+window.LibManager = LibManager;
+window.libManager = new LibManager();
+
+// Export for module systems
+if (typeof module !== "undefined" && module.exports) {
+	module.exports = LibManager;
+}

@@ -233,63 +233,20 @@ function toggleGuides(event) {
 function saveArtwork() {
 	var dom_spin = document.querySelector(".spin-container");
 	var output_hash = fxhash;
+	console.log(output_hash);
 	var canvas = document.getElementById("defaultCanvas0");
+	var d = new Date();
+	var datestring = `${d.getMonth() + 1}` + "_" + d.getDate() + "_" + d.getFullYear() + "_" + `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}_${fxhash}`;
+	console.log(canvas);
+	var fileName = datestring + ".png";
+	const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+	const a = document.createElement("a");
+	a.href = imageUrl;
+	a.setAttribute("download", fileName);
+	a.click();
 
-	if (!canvas) {
-		Logger.error("Canvas not found!");
-		return;
-	}
-
-	// Wait a frame to ensure canvas is fully rendered
-	requestAnimationFrame(() => {
-		// Create a temporary canvas with background to avoid transparency/white background issues
-		const tempCanvas = document.createElement("canvas");
-		const tempCtx = tempCanvas.getContext("2d");
-		tempCanvas.width = canvas.width;
-		tempCanvas.height = canvas.height;
-
-		// Always set a dark background first (matches HSB(0, 0, 2) from sketch)
-		tempCtx.fillStyle = "rgb(5, 5, 5)"; // Very dark background
-		tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-
-		// Check for transparent areas in the canvas
-		const ctx = canvas.getContext("2d");
-		const imageData = ctx.getImageData(0, 0, 100, 100); // Sample larger area
-		const data = imageData.data;
-		let hasTransparency = false;
-
-		// Check if any pixels have transparency (alpha < 255)
-		for (let i = 3; i < data.length; i += 4) {
-			// Check alpha channel
-			if (data[i] < 255) {
-				hasTransparency = true;
-				break;
-			}
-		}
-
-		if (hasTransparency) {
-			Logger.info("Transparent areas detected - compositing onto opaque background");
-		}
-
-		// Draw the original canvas on top of the dark background
-		// Use source-over to ensure proper compositing of transparent areas
-		tempCtx.globalCompositeOperation = "source-over";
-		tempCtx.drawImage(canvas, 0, 0);
-
-		var d = new Date();
-		var datestring = `${d.getMonth() + 1}` + "_" + d.getDate() + "_" + d.getFullYear() + "_" + `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}_${fxhash}`;
-		var fileName = datestring + ".png";
-
-		// Use the temporary canvas for export
-		const imageUrl = tempCanvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-		const a = document.createElement("a");
-		a.href = imageUrl;
-		a.setAttribute("download", fileName);
-		a.click();
-
-		//dom_spin.classList.remove("active");
-		Logger.success(`Saved ${fileName}${hasTransparency ? " (transparency handled)" : ""}`);
-	});
+	//dom_spin.classList.remove("active");
+	console.log("saved " + fileName);
 }
 
 function max(a, b) {
