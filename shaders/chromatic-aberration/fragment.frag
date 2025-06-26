@@ -42,6 +42,24 @@ float fbm(vec2 st) {
     return value;
 }
 
+// Film grain function
+float grain(vec2 uv, float time) {
+    vec2 noise_uv = uv * 512.0; // High frequency for fine grain
+
+    // Add time-based variation for animated grain
+    float t = time * 10.0;
+    noise_uv += vec2(sin(t * 0.1), cos(t * 0.07)) * 100.0;
+
+    // Generate high frequency noise
+    float grain_noise = random(noise_uv);
+
+    // Add another layer with different frequency
+    float grain_noise2 = random(noise_uv * 2.5 + vec2(t * 0.05, t * 0.03));
+
+    // Combine and normalize
+    return (grain_noise * 0.7 + grain_noise2 * 0.3) * 2.0 - 1.0;
+}
+
 void main() {
     vec2 uv = vTexCoord;
 
@@ -112,6 +130,24 @@ void main() {
         originalColor.b + blueDiff,
         1.0
     );
+
+        // Apply film grain effect
+    float grainAmount = 0.08; // Increased for more visible grain
+    float grainValue = grain(uv, uTime);
+
+    // Apply grain with both darkening and brightening
+    // Use multiplicative blending for more contrast
+    float grainFactor = 1.0 + grainValue * grainAmount;
+    color.rgb *= grainFactor;
+
+    // Add additional additive grain for highlights
+    color.rgb += grainValue * grainAmount * 0.3;
+
+    // Make grain more prominent in mid-tones
+    float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+    float grainMask = 1.0 - abs(luminance - 0.5) * 2.0; // Peak at mid-tones
+    grainMask = smoothstep(0.0, 1.0, grainMask);
+    color.rgb += grainValue * grainAmount * grainMask * 0.4;
 
     gl_FragColor = color;
 }
