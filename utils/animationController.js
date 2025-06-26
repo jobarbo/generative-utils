@@ -59,7 +59,7 @@ class AnimationController {
 			onComplete: null, // Callback when all cycles are done
 			onProgress: null, // Callback for progress updates (receives progress info)
 			saveFunction: null, // Custom save function, defaults to saveArtwork()
-			resetFunction: null, // Custom reset function, defaults to INIT()
+			resetFunction: INIT, // Custom reset function, defaults to INIT()
 			initFunction: null, // Custom init function to call after save
 			initSeed: null, // Seed to pass to init function
 			autoResetAfterSave: true, // Whether to automatically reset after saving
@@ -136,7 +136,7 @@ class AnimationController {
 	save() {
 		// Check if we've reached the maximum saved frames limit
 		if (this.calculatedMaxSavedFrames && this.savedFrameCount >= this.calculatedMaxSavedFrames) {
-			console.log(`Reached maximum saved frames limit: ${this.calculatedMaxSavedFrames}`);
+			Logger.warning(`Reached maximum saved frames limit: ${this.calculatedMaxSavedFrames}`);
 			this._complete();
 			return;
 		}
@@ -150,7 +150,6 @@ class AnimationController {
 		}
 
 		this.savedFrameCount++;
-		console.log(`Saved frame ${this.savedFrameCount}/${this.calculatedMaxSavedFrames || "∞"}`);
 
 		if (this.config.onSave) {
 			this.config.onSave(this.frameCount, this.savedFrameCount);
@@ -243,14 +242,17 @@ class AnimationController {
 	_handleP5Mode() {
 		// Save at specified intervals
 		if (this.frameCount % this.config.saveInterval === 0) {
+			Logger.info(`Frame ${this.frameCount}: Save interval reached - processing save cycle`);
+
 			// Update animated variables only when saving
 			this._updateAnimatedVariables();
 
-			// Always save first
+			// Save first (captures accumulated painting)
 			this.save();
 
-			// Always call init function after save if configured
+			// Call init function AFTER save to reset for next cycle
 			if (this.config.autoResetAfterSave) {
+				Logger.debug("Calling INIT function after save");
 				this._callInitFunction();
 			}
 
@@ -259,12 +261,10 @@ class AnimationController {
 				const angleValue = window[this.config.cycleDetectionAngle];
 				const cosValue = Math.cos(angleValue); // easeAng is already in radians
 
-				console.log(`cosIndex: ${cosValue}, lastCosValue: ${this.lastCosValue}`);
-
 				// Detect cycle completion when cos value crosses the threshold from below
 				if (cosValue >= this.config.cycleThreshold && this.lastCosValue < this.config.cycleThreshold) {
 					this.cycleCount++;
-					console.log(`Cycle completed! cycleCount: ${this.cycleCount}`);
+					Logger.animation.cycle(this.cycleCount);
 
 					// Check if we've completed all cycles
 					if (this.cycleCount >= this.config.maxCycles) {
@@ -306,9 +306,9 @@ class AnimationController {
 		for (const [varName, computeFunction] of Object.entries(this.config.computedVariables || {})) {
 			if (typeof computeFunction === "function") {
 				scope[varName] = computeFunction(scope);
-				console.log(`Computed ${varName}: ${scope[varName]}`);
+				Logger.debug(`Computed ${varName}: ${scope[varName]}`);
 			} else {
-				console.warn(`Compute function for ${varName} is not a function`);
+				Logger.warning(`Compute function for ${varName} is not a function`);
 			}
 		}
 	}
