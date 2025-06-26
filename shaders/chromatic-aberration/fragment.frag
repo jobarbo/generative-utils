@@ -33,7 +33,7 @@ void main() {
     vec4 originalColor = texture2D(uTexture, uv);
 
     // Chromatic aberration - noisy, organic effect
-    float aberrationAmount = 0.003;
+    float aberrationAmount = 0.0003;
 
     // Create noise-based direction vectors
     float noiseScale = 8.0;
@@ -41,7 +41,7 @@ void main() {
     float noiseY = cos(uv.x * noiseScale + uTime * 0.5) * sin(uv.y * noiseScale + uTime * 0.3);
 
     // Create varying aberration intensity based on noise
-    float noiseIntensity = (sin(uv.x * 15.0 + uTime * 2.0) + cos(uv.y * 12.0 + uTime * 1.5)) * 0.25;
+    float noiseIntensity = (sin(uv.x * 15.0 + uTime * 2.0) + cos(uv.y * 12.0 + uTime * 1.5)) * 10.25;
     float scaledAberration = aberrationAmount * (0.5 + noiseIntensity * 0.5);
 
     // Apply noise-based directional offsets
