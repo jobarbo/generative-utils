@@ -47,7 +47,7 @@ float grain(vec2 uv, float time) {
     vec2 noise_uv = uv * 512.0; // High frequency for fine grain
 
     // Add time-based variation for animated grain
-    float t = time * 10.0;
+    float t = time * 0.00001;
     noise_uv += vec2(sin(t * 0.1), cos(t * 0.07)) * 100.0;
 
     // Generate high frequency noise
