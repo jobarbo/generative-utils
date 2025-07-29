@@ -47,7 +47,7 @@ float grain(vec2 uv, float time) {
     vec2 noise_uv = uv * 512.0; // High frequency for fine grain
 
     // Rotate noise coordinates to break up diagonal patterns
-    float angle = -0.165; // Slight rotation
+    float angle = -0.01; // Slight rotation
     float cos_a = cos(angle);
     float sin_a = sin(angle);
     noise_uv = vec2(
@@ -57,7 +57,7 @@ float grain(vec2 uv, float time) {
 
     // Add time-based variation for animated grain
     float t = time * 0.0;
-    noise_uv += vec2(sin(t * 0.6), cos(t * 0.7)) * 11100.0;
+    noise_uv += vec2(sin(t * 0.6), cos(t * 0.7)) * 1100.0;
 
     // Generate high frequency noise
     float grain_noise = random(noise_uv);
