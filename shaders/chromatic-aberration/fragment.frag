@@ -5,6 +5,7 @@ varying vec2 vTexCoord;
 uniform sampler2D uTexture;
 uniform float uTime;
 uniform vec2 uResolution;
+uniform float uEffectType; // 0.0 for deformation, 1.0 for chromatic aberration
 
 // Simple 2D noise function
 float random(vec2 st) {
@@ -69,27 +70,33 @@ float grain(vec2 uv, float time) {
     return (grain_noise * 0.7 + grain_noise2 * 0.3) * 2.0 - 1.0;
 }
 
-void main() {
-    vec2 uv = vTexCoord;
+// Simple deformation function - preserves original colors
+vec4 applyDeformation(vec2 uv) {
+    // Create noise-based deformation
+    float noiseScale = 23.0;
+    vec2 noiseCoord = uv * noiseScale + uTime * 0.000000000001;
 
-    /*
-        // Wave distortion
-    float waveX = sin(uv.y * 1.0 + uTime) * 0.001;
-    float waveY = cos(uv.x * 1.0 + uTime) * 0.001;
-    vec2 waveOffset = vec2(waveX, waveY);
+    // Generate directional noise for X and Y
+    float noiseX = fbm(noiseCoord) * 2.0 - 1.0; // Convert from [0,1] to [-1,1]
+    float noiseY = fbm(noiseCoord + vec2(100.0, 100.0)) * 2.0 - 1.0; // Offset for different pattern
 
-    // Chromatic aberration
-    float aberrationAmount = 0.002;
-    vec2 redOffset = uv + waveOffset + vec2(aberrationAmount, 0.0);
-    vec2 blueOffset = uv + waveOffset - vec2(aberrationAmount, 0.0);
-    vec2 greenOffset = uv + waveOffset;
-    /*
+    // Create varying deformation intensity using layered noise
+    vec2 intensityCoord = uv * 10.0 + uTime * 0.1;
+    float noiseIntensity = fbm(intensityCoord);
+    float deformationAmount = 0.1 * (0.5 + noiseIntensity * 1.5);
 
+    // Apply noise-based deformation to UV coordinates
+    vec2 deformedUV = uv + vec2(noiseX, noiseY) * deformationAmount;
+
+    // Sample the texture with the deformed coordinates
+    return texture2D(uTexture, deformedUV);
+}
+
+// Chromatic aberration function - separates RGB channels
+vec4 applyChromaticAberration(vec2 uv) {
     // Wave distortion
-/*     float waveX = sin(uv.x * 100.0 + uTime) * tan(0.0025);
-    float waveY = cos(uv.y * 100.0 - uTime) * tan(0.0025); */
-    float waveX = tan(uv.y * 0.0 ) * tan(0.0075);
-    float waveY = tan(uv.x * 0.0 ) * tan(0.0075);
+    float waveX = tan(uv.y * 0.0) * tan(0.0075);
+    float waveY = tan(uv.x * 0.0) * tan(0.0075);
     vec2 waveOffset = vec2(waveX, waveY);
 
     // Sample the original image at the center position
@@ -126,21 +133,35 @@ void main() {
     float greenDiff = greenChannel.g - originalColor.g;
     float blueDiff = blueChannel.b - originalColor.b;
 
-    // Apply 50% saturation to the color difference
+    // Apply saturation to the color difference
     float saturationLevel = 1.0;
     redDiff *= saturationLevel;
     greenDiff *= saturationLevel;
     blueDiff *= saturationLevel;
 
-    // Add the reduced aberration effect back to the original color
-    vec4 color = vec4(
+    // Add the aberration effect back to the original color
+    return vec4(
         originalColor.r + redDiff,
         originalColor.g + greenDiff,
         originalColor.b + blueDiff,
         1.0
     );
+}
 
-        // Apply film grain effect
+void main() {
+    vec2 uv = vTexCoord;
+
+    // Choose effect based on uniform
+    vec4 color;
+    if (uEffectType < 0.5) {
+        // Simple deformation
+        color = applyDeformation(uv);
+    } else {
+        // Chromatic aberration
+        color = applyChromaticAberration(uv);
+    }
+
+    // Apply film grain effect
     float grainAmount = 0.1; // Increased for more visible grain
     float grainValue = grain(uv, uTime);
 
