@@ -57,7 +57,7 @@ float grain(vec2 uv, float time) {
 
     // Add time-based variation for animated grain
     float t = time * 0.0;
-    noise_uv += vec2(sin(t * 0.1), cos(t * 0.07)) * 100.0;
+    noise_uv += vec2(sin(t * 0.6), cos(t * 0.7)) * 11100.0;
 
     // Generate high frequency noise
     float grain_noise = random(noise_uv);
