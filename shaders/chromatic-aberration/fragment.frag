@@ -103,7 +103,7 @@ vec4 applyChromaticAberration(vec2 uv) {
     vec4 originalColor = texture2D(uTexture, uv);
 
     // Chromatic aberration - noisy, organic effect
-    float aberrationAmount = 0.003; // Increased for more visible effect
+    float aberrationAmount = 0.0; // Increased for more visible effect
 
     // Create noise-based direction vectors using proper noise functions
     float noiseScale = 6.0;
@@ -162,7 +162,7 @@ void main() {
     }
 
     // Apply film grain effect
-    float grainAmount = 0.1; // Increased for more visible grain
+    float grainAmount = 0.0; // Increased for more visible grain
     float grainValue = grain(uv, uTime);
 
     // Apply grain with both darkening and brightening
