@@ -195,6 +195,16 @@ let dpi = (maxDPI = 3.0) => {
 	}
 };
 
+// Helper function to truncate multiplier calculations to 2 decimals
+function truncateMultiplier(value, decimals = 2) {
+	return Math.round(value * 10 ** decimals) / 10 ** decimals;
+}
+
+/* ---------- Helper: round off noise coords --------------- */
+function truncateNoiseCoord(val, p = 5) {
+	return Math.round(val * 10 ** p) / 10 ** p;
+}
+
 // if cmd + s is pressed, save the canvas'
 function saveCanvas(event) {
 	const logger = window.Logger || console;
