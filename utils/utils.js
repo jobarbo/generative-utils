@@ -428,3 +428,59 @@ class ExecutionTimer {
 		return this;
 	}
 }
+
+/**
+ * P5.js Dimension-Agnostic Utilities
+ * Simple adaptation of SketchEngine for p5.js
+ */
+
+// Global state for dimension-agnostic scaling
+let p5PixelRatio = 1;
+let p5LogicalSize = null;
+let p5ScaleFactor = 1;
+
+/**
+ * Sets the pixel ratio for the p5.js canvas
+ * @param {number} ratio - The pixel ratio to set
+ */
+function setPixelRatio(ratio) {
+	p5PixelRatio = ratio;
+	if (typeof resizeCanvas === "function") {
+		resizeCanvas(width, height);
+	}
+}
+
+/**
+ * Sets the dimension-agnostic logical size
+ * @param {number} logicalSize - The logical size for scaling
+ */
+function setDimensionAgnostic(logicalSize) {
+	p5LogicalSize = logicalSize;
+	_updateP5Scaling();
+}
+
+/**
+ * Updates the p5.js scaling transformation
+ */
+function _updateP5Scaling() {
+	if (p5LogicalSize && typeof width !== "undefined" && typeof height !== "undefined") {
+		p5ScaleFactor = Math.min(width, height) / p5LogicalSize;
+		// Apply the transformation directly
+		scale(p5PixelRatio * p5ScaleFactor);
+	} else {
+		p5ScaleFactor = 1;
+		scale(p5PixelRatio);
+	}
+}
+
+/**
+ * Resizes the p5.js canvas with proper scaling
+ * @param {number} w - New width
+ * @param {number} h - New height
+ */
+function resizeP5Canvas(w, h) {
+	if (typeof resizeCanvas === "function") {
+		resizeCanvas(w, h);
+		_updateP5Scaling();
+	}
+}
