@@ -45,10 +45,10 @@ float fbm(vec2 st) {
 
 // Film grain function
 float grain(vec2 uv, float time) {
-    vec2 noise_uv = uv * 512.0; // High frequency for fine grain
+    vec2 noise_uv = uv * 52.0; // High frequency for fine grain
 
     // Rotate noise coordinates to break up diagonal patterns
-    float angle = -0.01; // Slight rotation
+    float angle = -0.15; // Slight rotation
     float cos_a = cos(angle);
     float sin_a = sin(angle);
     noise_uv = vec2(
@@ -162,7 +162,7 @@ void main() {
     }
 
     // Apply film grain effect
-    float grainAmount = 0.0; // Increased for more visible grain
+    float grainAmount = 0.1; // Increased for more visible grain
     float grainValue = grain(uv, uTime);
 
     // Apply grain with both darkening and brightening
