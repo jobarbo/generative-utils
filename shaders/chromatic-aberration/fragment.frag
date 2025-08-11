@@ -48,7 +48,7 @@ float grain(vec2 uv, float time) {
     vec2 noise_uv = uv * 52.0; // High frequency for fine grain
 
     // Rotate noise coordinates to break up diagonal patterns
-    float angle = -0.15; // Slight rotation
+    float angle = -0.25; // Slight rotation
     float cos_a = cos(angle);
     float sin_a = sin(angle);
     noise_uv = vec2(
@@ -103,7 +103,7 @@ vec4 applyChromaticAberration(vec2 uv) {
     vec4 originalColor = texture2D(uTexture, uv);
 
     // Chromatic aberration - noisy, organic effect
-    float aberrationAmount = 0.0; // Increased for more visible effect
+    float aberrationAmount = 0.003; // Increased for more visible effect
 
     // Create noise-based direction vectors using proper noise functions
     float noiseScale = 6.0;
@@ -171,7 +171,7 @@ void main() {
     color.rgb *= grainFactor;
 
     // Add additional additive grain for highlights
-    color.rgb += grainValue * grainAmount * 0.3;
+    color.rgb += grainValue * grainAmount * 1.3;
 
     // Make grain more prominent in mid-tones
     float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
