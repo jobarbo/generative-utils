@@ -35,7 +35,7 @@ float fbm(vec2 st) {
     float value = 0.0;
     float amplitude = 0.5;
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 6; i++) {
         value += amplitude * noise(st);
         st *= 2.0;
         amplitude *= 0.5;
@@ -73,7 +73,7 @@ float grain(vec2 uv, float time) {
 // Simple deformation function - preserves original colors
 vec4 applyDeformation(vec2 uv) {
     // Create noise-based deformation
-    float noiseScale = 23.0;
+    float noiseScale = 15.0;
     vec2 noiseCoord = uv * noiseScale + uTime * 0.000000000001;
 
     // Generate directional noise for X and Y
@@ -81,7 +81,7 @@ vec4 applyDeformation(vec2 uv) {
     float noiseY = fbm(noiseCoord + vec2(100.0, 100.0)) * 2.0 - 1.0; // Offset for different pattern
 
     // Create varying deformation intensity using layered noise
-    vec2 intensityCoord = uv * 10.0 + uTime * 0.1;
+    vec2 intensityCoord = uv * 2.0 + uTime * 0.1;
     float noiseIntensity = fbm(intensityCoord);
     float deformationAmount = 0.1 * (0.5 + noiseIntensity * 1.5);
 
