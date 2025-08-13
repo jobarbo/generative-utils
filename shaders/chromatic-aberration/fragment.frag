@@ -6,22 +6,23 @@ uniform sampler2D uTexture;
 uniform float uTime;
 uniform vec2 uResolution;
 uniform float uEffectType; // 0.0 for deformation, 1.0 for chromatic aberration
+uniform float uSeed; // Random seed for noise variation
 
-// Simple 2D noise function
-float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+// Simple 2D noise function with seed
+float random(vec2 st, float seed) {
+    return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
 }
 
-// 2D Noise based on Morgan McGuire @morgan3d
-float noise(vec2 st) {
+// 2D Noise based on Morgan McGuire @morgan3d with seed
+float noise(vec2 st, float seed) {
     vec2 i = floor(st);
     vec2 f = fract(st);
 
     // Four corners in 2D of a tile
-    float a = random(i);
-    float b = random(i + vec2(1.0, 0.0));
-    float c = random(i + vec2(0.0, 1.0));
-    float d = random(i + vec2(1.0, 1.0));
+    float a = random(i, seed);
+    float b = random(i + vec2(1.0, 0.0), seed);
+    float c = random(i + vec2(0.0, 1.0), seed);
+    float d = random(i + vec2(1.0, 1.0), seed);
 
     vec2 u = f * f * (3.0 - 2.0 * f);
 
@@ -30,21 +31,21 @@ float noise(vec2 st) {
            (d - b) * u.x * u.y;
 }
 
-// Fractal Brownian Motion for more complex noise
-float fbm(vec2 st) {
+// Fractal Brownian Motion for more complex noise with seed
+float fbm(vec2 st, float seed) {
     float value = 0.0;
     float amplitude = 0.5;
 
     for (int i = 0; i < 6; i++) {
-        value += amplitude * noise(st);
+        value += amplitude * noise(st, seed);
         st *= 2.0;
         amplitude *= 0.5;
     }
     return value;
 }
 
-// Film grain function
-float grain(vec2 uv, float time) {
+// Film grain function with seed
+float grain(vec2 uv, float time, float seed) {
     vec2 noise_uv = uv * 52.0; // High frequency for fine grain
 
     // Rotate noise coordinates to break up diagonal patterns
@@ -60,11 +61,11 @@ float grain(vec2 uv, float time) {
     float t = time * 0.0;
     noise_uv += vec2(sin(t * 0.6), cos(t * 0.7)) * 1100.0;
 
-    // Generate high frequency noise
-    float grain_noise = random(noise_uv);
+    // Generate high frequency noise with seed
+    float grain_noise = random(noise_uv, seed);
 
-    // Add another layer with different frequency
-    float grain_noise2 = random(noise_uv * 2.5 + vec2(t * 0.05, t * 0.03));
+    // Add another layer with different frequency and seed offset
+    float grain_noise2 = random(noise_uv * 2.5 + vec2(t * 0.05, t * 0.03), seed + 123.456);
 
     // Combine and normalize
     return (grain_noise * 0.7 + grain_noise2 * 0.3) * 2.0 - 1.0;
@@ -76,13 +77,14 @@ vec4 applyDeformation(vec2 uv) {
     float noiseScale = 15.0;
     vec2 noiseCoord = uv * noiseScale + uTime * 0.000000000001;
 
-    // Generate directional noise for X and Y
-    float noiseX = fbm(noiseCoord) * 2.0 - 1.0; // Convert from [0,1] to [-1,1]
-    float noiseY = fbm(noiseCoord + vec2(100.0, 100.0)) * 2.0 - 1.0; // Offset for different pattern
+    // Generate directional noise for X and Y with seed
+    float noiseX = fbm(noiseCoord, uSeed) * 2.0 - 1.0; // Convert from [0,1] to [-1,1]
+    float noiseY = fbm(noiseCoord + vec2(120.0, 210.0), uSeed + 1230.0) * 2.0 - 1.0; // Offset for different pattern
 
     // Create varying deformation intensity using layered noise
     vec2 intensityCoord = uv * 2.0 + uTime * 0.1;
-    float noiseIntensity = fbm(intensityCoord);
+    //!vec2 intensityCoord = uv * fbm(uv * 16000.0 * sin(noiseX),uSeed + 213.0) * 11100.0 + uTime * 0.1; // **great washed up textures**
+    float noiseIntensity = fbm(intensityCoord, uSeed + 1230.0 );
     float deformationAmount = 0.1 * (0.5 + noiseIntensity * 1.5);
 
     // Apply noise-based deformation to UV coordinates
@@ -109,13 +111,13 @@ vec4 applyChromaticAberration(vec2 uv) {
     float noiseScale = 6.0;
     vec2 noiseCoord = uv * noiseScale + uTime * 0.2;
 
-    // Generate directional noise for X and Y
-    float noiseX = fbm(noiseCoord) * 2.0 - 1.0; // Convert from [0,1] to [-1,1]
-    float noiseY = fbm(noiseCoord + vec2(100.0, 100.0)) * 2.0 - 1.0; // Offset for different pattern
+    // Generate directional noise for X and Y with seed
+    float noiseX = fbm(noiseCoord, uSeed + 234.567) * 2.0 - 1.0; // Convert from [0,1] to [-1,1]
+    float noiseY = fbm(noiseCoord + vec2(100.0, 100.0), uSeed + 567.890) * 2.0 - 1.0; // Offset for different pattern
 
     // Create varying aberration intensity using layered noise
     vec2 intensityCoord = uv * 10.0 + uTime * 0.1;
-    float noiseIntensity = fbm(intensityCoord);
+    float noiseIntensity = fbm(intensityCoord, uSeed + 890.234);
     float scaledAberration = aberrationAmount * (0.5 + noiseIntensity * 1.5);
 
     // Apply noise-based directional offsets
@@ -163,7 +165,7 @@ void main() {
 
     // Apply film grain effect
     float grainAmount = 0.1; // Increased for more visible grain
-    float grainValue = grain(uv, uTime);
+    float grainValue = grain(uv, uTime, uSeed + 345.678);
 
     // Apply grain with both darkening and brightening
     // Use multiplicative blending for more contrast
