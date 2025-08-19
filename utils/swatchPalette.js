@@ -175,7 +175,7 @@ class SwatchPalette {
 		const names = this.getSwatchNames();
 		if (names.length === 0) return null;
 
-		const randomName = names[Math.floor(Math.random() * names.length)];
+		const randomName = names[Math.floor(fxrand() * names.length)];
 		return this.getPalette(randomName);
 	}
 
