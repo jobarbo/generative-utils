@@ -57,14 +57,15 @@ class ShaderManager {
 	 * @param {object} uniforms - Object with uniform values to set
 	 * @param {p5.Graphics} target - Optional target to render to
 	 */
-	apply(name, uniforms = {}) {
+	apply(name, uniforms = {}, target = null) {
 		if (!this.shaders[name]) {
 			console.error(`Shader "${name}" not found`);
 			return this;
 		}
 
 		const shader = this.shaders[name];
-		this.p5Instance.shader(shader);
+		const ctx = target || this.p5Instance;
+		ctx.shader(shader);
 
 		// Set uniforms
 		for (const [key, value] of Object.entries(uniforms)) {
@@ -77,21 +78,36 @@ class ShaderManager {
 	/**
 	 * Draw a fullscreen quad to render the shader
 	 */
-	drawFullscreenQuad() {
-		this.p5Instance.push();
-		this.p5Instance.noStroke();
+	drawFullscreenQuad(target = null) {
+		const ctx = target || this.p5Instance;
+		ctx.push();
+		ctx.noStroke();
 
 		// Draw the quad with correct texture coordinates
-		this.p5Instance.beginShape();
+		ctx.beginShape();
 		// Format: vertex(x, y, z, textureU, textureV)
-		this.p5Instance.vertex(-1, 1, 0, 0, 0); // top-left
-		this.p5Instance.vertex(1, 1, 0, 1, 0); // top-right
-		this.p5Instance.vertex(1, -1, 0, 1, 1); // bottom-right
-		this.p5Instance.vertex(-1, -1, 0, 0, 1); // bottom-left
-		this.p5Instance.endShape(this.p5Instance.CLOSE);
+		ctx.vertex(-1, 1, 0, 0, 0); // top-left
+		ctx.vertex(1, 1, 0, 1, 0); // top-right
+		ctx.vertex(1, -1, 0, 1, 1); // bottom-right
+		ctx.vertex(-1, -1, 0, 0, 1); // bottom-left
+		ctx.endShape(ctx.CLOSE);
 
-		this.p5Instance.pop();
+		ctx.pop();
 		return this;
+	}
+
+	/**
+	 * Create an offscreen WEBGL buffer for shader passes
+	 * @param {number} width
+	 * @param {number} height
+	 * @returns {p5.Graphics}
+	 */
+	createBuffer(width, height) {
+		if (!this.p5Instance) {
+			console.error("ShaderManager not initialized");
+			return null;
+		}
+		return this.p5Instance.createGraphics(width, height, this.p5Instance.WEBGL);
 	}
 }
 
