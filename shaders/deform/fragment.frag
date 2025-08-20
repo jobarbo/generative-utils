@@ -44,7 +44,7 @@ void main() {
 	//vec2 intensityCoord = uv * 2.0 + uTime * 0.1;
 	vec2 intensityCoord = uv * fbm(uv * 16000.0 * sin(noiseX),uSeed + 213.0) * 11100.0 + uTime * 0.1; // **great washed up textures**
 	float noiseIntensity = fbm(intensityCoord, uSeed + 1230.0);
-	float deformationAmount = scale * (0.5 + noiseIntensity * 1.5);
+	float deformationAmount = smoothstep(0.5, 0.49, max(abs(uv.x - 0.5), abs(uv.y - 0.5))) * scale * (0.5 + noiseIntensity * 1.5);
 	vec2 deformedUV = uv + vec2(noiseX, noiseY) * deformationAmount;
 
 	gl_FragColor = texture2D(uTexture, deformedUV);
