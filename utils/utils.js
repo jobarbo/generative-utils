@@ -270,46 +270,20 @@ function saveArtwork() {
 	logger.debug ? logger.debug("Canvas element: " + (canvas ? "Found" : "Not found")) : logger.log("Canvas element:", canvas);
 	var fileName = datestring + ".png";
 
-	// Enhanced download handling for Safari mobile
+	// Simple Safari mobile handling - just show instructions
 	if (isSafariMobile()) {
-		// For Safari mobile, we need to handle downloads differently
-		try {
-			// Create a blob from the canvas data
-			canvas.toBlob((blob) => {
-				// Create object URL
-				const url = URL.createObjectURL(blob);
-
-				// Create a temporary link element
-				const link = document.createElement("a");
-				link.href = url;
-				link.download = fileName;
-
-				// For Safari mobile, we need to trigger the download differently
-				document.body.appendChild(link);
-				link.click();
-				document.body.removeChild(link);
-
-				// Clean up the object URL
-				setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-				logger.success ? logger.success("Download initiated for Safari mobile: " + fileName) : logger.log("Download initiated for Safari mobile:", fileName);
-			}, "image/png");
-		} catch (error) {
-			logger.error ? logger.error("Safari mobile download failed:", error) : console.error("Safari mobile download failed:", error);
-
-			// Fallback: show instructions for manual save
-			alert("For Safari mobile: Long press on the image and select 'Save to Photos' or 'Add to Photos'");
-		}
-	} else {
-		// Standard download for other browsers
-		const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-		const a = document.createElement("a");
-		a.href = imageUrl;
-		a.setAttribute("download", fileName);
-		a.click();
-
-		logger.success ? logger.success("Saved " + fileName) : logger.log("saved " + fileName);
+		alert("Long press on the image and select 'Save to Photos'");
+		return;
 	}
+
+	// Standard download for other browsers
+	const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+	const a = document.createElement("a");
+	a.href = imageUrl;
+	a.setAttribute("download", fileName);
+	a.click();
+
+	logger.success ? logger.success("Saved " + fileName) : logger.log("saved " + fileName);
 }
 
 // Create and show download button (only if not in iframe)
@@ -338,91 +312,31 @@ function createDownloadButton() {
 }
 
 function createDownloadButtonUI() {
-	// Create button container
-	const buttonContainer = document.createElement("div");
-	buttonContainer.id = "download-button-container";
-	buttonContainer.style.cssText = `
+	// Create simple download button
+	const downloadButton = document.createElement("button");
+	downloadButton.id = "download-button";
+	downloadButton.textContent = isSafariMobile() ? "Save to Photos" : "Download";
+	downloadButton.style.cssText = `
 		position: fixed;
 		top: 20px;
 		right: 20px;
 		z-index: 1000;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	`;
-
-	// Create download button
-	const downloadButton = document.createElement("button");
-	downloadButton.id = "download-button";
-	downloadButton.textContent = "Download";
-	downloadButton.style.cssText = `
 		background: rgba(0, 0, 0, 0.8);
 		color: white;
 		border: none;
 		border-radius: 8px;
 		padding: 12px 20px;
 		font-size: 16px;
-		font-weight: 500;
 		cursor: pointer;
-		transition: all 0.2s ease;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
 	`;
-
-	// Add hover effects
-	downloadButton.addEventListener("mouseenter", () => {
-		downloadButton.style.background = "rgba(0, 0, 0, 0.9)";
-		downloadButton.style.transform = "translateY(-2px)";
-		downloadButton.style.boxShadow = "0 6px 16px rgba(0, 0, 0, 0.25)";
-	});
-
-	downloadButton.addEventListener("mouseleave", () => {
-		downloadButton.style.background = "rgba(0, 0, 0, 0.8)";
-		downloadButton.style.transform = "translateY(0)";
-		downloadButton.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
-	});
 
 	// Add click handler
 	downloadButton.addEventListener("click", () => {
-		// Add loading state
-		downloadButton.textContent = "Downloading...";
-		downloadButton.style.background = "rgba(0, 0, 0, 0.6)";
-		downloadButton.disabled = true;
-
-		// Call save function
-		try {
-			saveArtwork();
-
-			// Show success state briefly
-			setTimeout(() => {
-				downloadButton.textContent = "Downloaded!";
-				downloadButton.style.background = "rgba(0, 100, 0, 0.8)";
-
-				// Reset after 2 seconds
-				setTimeout(() => {
-					downloadButton.textContent = "Download";
-					downloadButton.style.background = "rgba(0, 0, 0, 0.8)";
-					downloadButton.disabled = false;
-				}, 2000);
-			}, 500);
-		} catch (error) {
-			console.error("Download failed:", error);
-			downloadButton.textContent = "Failed";
-			downloadButton.style.background = "rgba(200, 0, 0, 0.8)";
-
-			// Reset after 2 seconds
-			setTimeout(() => {
-				downloadButton.textContent = "Download";
-				downloadButton.style.background = "rgba(0, 0, 0, 0.8)";
-				downloadButton.disabled = false;
-			}, 2000);
-		}
+		saveArtwork();
 	});
 
-	// Add button to container
-	buttonContainer.appendChild(downloadButton);
-
-	// Add container to body
-	document.body.appendChild(buttonContainer);
+	// Add button to body
+	document.body.appendChild(downloadButton);
 }
 
 function max(a, b) {
