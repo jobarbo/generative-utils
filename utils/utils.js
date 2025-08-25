@@ -1,6 +1,14 @@
 let noiseCanvasWidth = 1;
 let noiseCanvasHeight = 1;
 
+// Safari mobile detection function
+function isSafariMobile() {
+	const userAgent = navigator.userAgent;
+	const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+	const isSafari = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
+	return isIOS && isSafari;
+}
+
 let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 let smoothstep = (a, b, x) => (((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
 let mix = (a, b, p) => a + p * (b - a);
