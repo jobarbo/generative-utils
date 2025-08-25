@@ -1,14 +1,6 @@
 let noiseCanvasWidth = 1;
 let noiseCanvasHeight = 1;
 
-// Safari mobile detection function
-function isSafariMobile() {
-	const userAgent = navigator.userAgent;
-	const isIOS = /iPad|iPhone|iPod/.test(userAgent);
-	const isSafari = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
-	return isIOS && isSafari;
-}
-
 // Check if the sketch is running in an iframe
 function isInIframe() {
 	try {
@@ -270,12 +262,6 @@ function saveArtwork() {
 	logger.debug ? logger.debug("Canvas element: " + (canvas ? "Found" : "Not found")) : logger.log("Canvas element:", canvas);
 	var fileName = datestring + ".png";
 
-	// Simple Safari mobile handling - just show instructions
-	if (isSafariMobile()) {
-		alert("Long press on the image and select 'Save to Photos'");
-		return;
-	}
-
 	// Standard download for other browsers
 	const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
 	const a = document.createElement("a");
@@ -315,7 +301,7 @@ function createDownloadButtonUI() {
 	// Create simple download button
 	const downloadButton = document.createElement("button");
 	downloadButton.id = "download-button";
-	downloadButton.textContent = isSafariMobile() ? "Save to Photos" : "Download";
+	downloadButton.textContent = "Download";
 	downloadButton.style.cssText = `
 		position: fixed;
 		top: 20px;
