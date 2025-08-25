@@ -54,7 +54,6 @@ class SwatchPalette {
 						this.loadedImages.set(swatchName, img);
 						const colors = this.extractColorsFromImage(img);
 						this.swatches.set(swatchName, colors);
-						console.log(`Loaded swatch '${swatchName}' with ${colors.length} colors`);
 						resolve();
 					} catch (error) {
 						console.error(`Failed to extract colors from ${swatchName}:`, error);

@@ -14,11 +14,19 @@ class ShaderPipeline {
 		this.height = 0;
 	}
 
-	init(width, height) {
+	init(width, height, enabledEffects = []) {
 		this.width = width;
 		this.height = height;
-		// Create two ping-pong buffers in WEBGL mode
-		this.buffers = [this.shaderManager.createBuffer(width, height), this.shaderManager.createBuffer(width, height)];
+
+		// Only create buffers if we have multiple effects that need ping-pong
+		if (enabledEffects.length <= 1) {
+			this.buffers = [];
+		} else {
+			// Only create 2 buffers when we actually need ping-pong (2+ effects)
+			this.buffers = [this.shaderManager.createBuffer(width, height), this.shaderManager.createBuffer(width, height)];
+		}
+
+		// Initialize buffers
 		for (const buf of this.buffers) {
 			if (buf) {
 				buf.noStroke();
@@ -54,25 +62,38 @@ class ShaderPipeline {
 			return;
 		}
 
+		// Special case: if only one effect, render directly to output
+		if (this.passes.length === 1) {
+			const {name, uniformsProvider} = this.passes[0];
+			const uniforms = Object.assign({}, uniformsProvider(), {uTexture: inputTexture});
+			this.shaderManager.apply(name, uniforms, outputTarget).drawFullscreenQuad(outputTarget);
+			return;
+		}
+
+		// For multiple effects, use ping-pong between 2 buffers
 		let readTex = inputTexture;
 		let ping = 0;
 
 		for (let i = 0; i < this.passes.length; i++) {
 			const {name, uniformsProvider} = this.passes[i];
-			const writeBuf = this.buffers[ping];
-			writeBuf.clear();
 
-			const uniforms = Object.assign({}, uniformsProvider(), {uTexture: readTex});
+			if (i === this.passes.length - 1) {
+				// Last effect renders directly to output
+				const uniforms = Object.assign({}, uniformsProvider(), {uTexture: readTex});
+				this.shaderManager.apply(name, uniforms, outputTarget).drawFullscreenQuad(outputTarget);
+			} else {
+				// Intermediate effects use ping-pong buffers
+				const writeBuf = this.buffers[ping];
+				writeBuf.clear();
 
-			this.shaderManager.apply(name, uniforms, writeBuf).drawFullscreenQuad(writeBuf);
+				const uniforms = Object.assign({}, uniformsProvider(), {uTexture: readTex});
+				this.shaderManager.apply(name, uniforms, writeBuf).drawFullscreenQuad(writeBuf);
 
-			// Next pass reads from what we just wrote
-			readTex = writeBuf;
-			ping = 1 - ping;
+				// Next effect reads from what we just wrote
+				readTex = writeBuf;
+				ping = 1 - ping; // Switch between buffers
+			}
 		}
-
-		// Final blit to output
-		this.shaderManager.apply("copy", {uTexture: readTex}, outputTarget).drawFullscreenQuad(outputTarget);
 	}
 }
 
