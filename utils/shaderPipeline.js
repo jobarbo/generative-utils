@@ -23,7 +23,7 @@ class ShaderPipeline {
 			this.buffers = [];
 		} else {
 			// Only create 2 buffers when we actually need ping-pong (2+ effects)
-			this.buffers = [this.shaderManager.createBuffer(width / 5, height / 5), this.shaderManager.createBuffer(width / 5, height / 5)];
+			this.buffers = [this.shaderManager.createBuffer(width / 2, height / 2), this.shaderManager.createBuffer(width / 2, height / 2)];
 		}
 
 		// Initialize buffers
