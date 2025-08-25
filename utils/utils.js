@@ -9,6 +9,15 @@ function isSafariMobile() {
 	return isIOS && isSafari;
 }
 
+// Check if the sketch is running in an iframe
+function isInIframe() {
+	try {
+		return window !== window.top;
+	} catch (e) {
+		return true;
+	}
+}
+
 let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 let smoothstep = (a, b, x) => (((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
 let mix = (a, b, p) => a + p * (b - a);
@@ -260,14 +269,160 @@ function saveArtwork() {
 	var datestring = `${d.getMonth() + 1}` + "_" + d.getDate() + "_" + d.getFullYear() + "_" + `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}_${fxhash}`;
 	logger.debug ? logger.debug("Canvas element: " + (canvas ? "Found" : "Not found")) : logger.log("Canvas element:", canvas);
 	var fileName = datestring + ".png";
-	const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
-	const a = document.createElement("a");
-	a.href = imageUrl;
-	a.setAttribute("download", fileName);
-	a.click();
 
-	//dom_spin.classList.remove("active");
-	logger.success ? logger.success("Saved " + fileName) : logger.log("saved " + fileName);
+	// Enhanced download handling for Safari mobile
+	if (isSafariMobile()) {
+		// For Safari mobile, we need to handle downloads differently
+		try {
+			// Create a blob from the canvas data
+			canvas.toBlob((blob) => {
+				// Create object URL
+				const url = URL.createObjectURL(blob);
+
+				// Create a temporary link element
+				const link = document.createElement("a");
+				link.href = url;
+				link.download = fileName;
+
+				// For Safari mobile, we need to trigger the download differently
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+
+				// Clean up the object URL
+				setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+				logger.success ? logger.success("Download initiated for Safari mobile: " + fileName) : logger.log("Download initiated for Safari mobile:", fileName);
+			}, "image/png");
+		} catch (error) {
+			logger.error ? logger.error("Safari mobile download failed:", error) : console.error("Safari mobile download failed:", error);
+
+			// Fallback: show instructions for manual save
+			alert("For Safari mobile: Long press on the image and select 'Save to Photos' or 'Add to Photos'");
+		}
+	} else {
+		// Standard download for other browsers
+		const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+		const a = document.createElement("a");
+		a.href = imageUrl;
+		a.setAttribute("download", fileName);
+		a.click();
+
+		logger.success ? logger.success("Saved " + fileName) : logger.log("saved " + fileName);
+	}
+}
+
+// Create and show download button (only if not in iframe)
+function createDownloadButton() {
+	// Don't show button if in iframe
+	if (isInIframe()) {
+		return;
+	}
+
+	// Check if button already exists
+	if (document.getElementById("download-button")) {
+		return;
+	}
+
+	// Wait a bit for the canvas to be ready
+	setTimeout(() => {
+		const canvas = document.getElementById("defaultCanvas0");
+		if (!canvas) {
+			console.log("Canvas not ready yet, retrying...");
+			createDownloadButton();
+			return;
+		}
+
+		createDownloadButtonUI();
+	}, 500);
+}
+
+function createDownloadButtonUI() {
+	// Create button container
+	const buttonContainer = document.createElement("div");
+	buttonContainer.id = "download-button-container";
+	buttonContainer.style.cssText = `
+		position: fixed;
+		top: 20px;
+		right: 20px;
+		z-index: 1000;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	`;
+
+	// Create download button
+	const downloadButton = document.createElement("button");
+	downloadButton.id = "download-button";
+	downloadButton.textContent = "Download";
+	downloadButton.style.cssText = `
+		background: rgba(0, 0, 0, 0.8);
+		color: white;
+		border: none;
+		border-radius: 8px;
+		padding: 12px 20px;
+		font-size: 16px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+	`;
+
+	// Add hover effects
+	downloadButton.addEventListener("mouseenter", () => {
+		downloadButton.style.background = "rgba(0, 0, 0, 0.9)";
+		downloadButton.style.transform = "translateY(-2px)";
+		downloadButton.style.boxShadow = "0 6px 16px rgba(0, 0, 0, 0.25)";
+	});
+
+	downloadButton.addEventListener("mouseleave", () => {
+		downloadButton.style.background = "rgba(0, 0, 0, 0.8)";
+		downloadButton.style.transform = "translateY(0)";
+		downloadButton.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
+	});
+
+	// Add click handler
+	downloadButton.addEventListener("click", () => {
+		// Add loading state
+		downloadButton.textContent = "Downloading...";
+		downloadButton.style.background = "rgba(0, 0, 0, 0.6)";
+		downloadButton.disabled = true;
+
+		// Call save function
+		try {
+			saveArtwork();
+
+			// Show success state briefly
+			setTimeout(() => {
+				downloadButton.textContent = "Downloaded!";
+				downloadButton.style.background = "rgba(0, 100, 0, 0.8)";
+
+				// Reset after 2 seconds
+				setTimeout(() => {
+					downloadButton.textContent = "Download";
+					downloadButton.style.background = "rgba(0, 0, 0, 0.8)";
+					downloadButton.disabled = false;
+				}, 2000);
+			}, 500);
+		} catch (error) {
+			console.error("Download failed:", error);
+			downloadButton.textContent = "Failed";
+			downloadButton.style.background = "rgba(200, 0, 0, 0.8)";
+
+			// Reset after 2 seconds
+			setTimeout(() => {
+				downloadButton.textContent = "Download";
+				downloadButton.style.background = "rgba(0, 0, 0, 0.8)";
+				downloadButton.disabled = false;
+			}, 2000);
+		}
+	});
+
+	// Add button to container
+	buttonContainer.appendChild(downloadButton);
+
+	// Add container to body
+	document.body.appendChild(buttonContainer);
 }
 
 function max(a, b) {
