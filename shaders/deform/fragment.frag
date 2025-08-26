@@ -5,6 +5,7 @@ varying vec2 vTexCoord;
 uniform sampler2D uTexture;
 uniform float uTime;
 uniform float uSeed;
+uniform float uOctave;
 uniform float uAmount; // deformation scale
 
 float random(vec2 st, float seed) {
@@ -25,11 +26,15 @@ float noise(vec2 st, float seed) {
 float fbm(vec2 st, float seed) {
 	float value = 0.0;
 	float amplitude = 0.5;
-	for (int i = 0; i < 6; i++) {
-		value += amplitude * noise(st, seed);
+
+	// Use a fixed loop with step function to control octaves
+	for (int i = 0; i < 8; i++) {
+		float step = step(float(i), uOctave);
+		value += step * amplitude * noise(st, seed);
 		st *= 2.0;
 		amplitude *= 0.5;
 	}
+
 	return value;
 }
 
