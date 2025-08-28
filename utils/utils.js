@@ -10,6 +10,15 @@ function isInIframe() {
 	}
 }
 
+// Check if the user is on Safari mobile
+function isSafariMobile() {
+	const ua = window.navigator.userAgent;
+	const iOS = !!ua.match(/iPad/i) || !!ua.match(/iPhone/i);
+	const webkit = !!ua.match(/WebKit/i);
+	const iOSSafari = iOS && webkit && !ua.match(/CriOS/i);
+	return iOSSafari;
+}
+
 let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 let smoothstep = (a, b, x) => (((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
 let mix = (a, b, p) => a + p * (b - a);
