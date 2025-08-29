@@ -59,7 +59,7 @@ void main() {
 	float noiseX = fbm(noiseCoord, uSeed) * 2.0 - 1.0;
 	float noiseY = fbm(noiseCoord + vec2(120.0, 210.0), uSeed + 1230.0) * 2.0 - 1.0;
 	//vec2 intensityCoord = uv * 2.0 + randomDir * uTime * 0.1;
-	vec2 intensityCoord = uv * fbm(uv * 16000.0 * sin(noiseX),uSeed + 213.0) * 2.0 + uTime * 0.1; // **great washed up textures**
+	vec2 intensityCoord = uv * fbm(uv * 16000.0 * sin(noiseX),uSeed + 213.0) * 4.0 + uTime * 0.1; // **great washed up textures**
 	float noiseIntensity = fbm(intensityCoord, uSeed + 1230.0);
 	float deformationAmount = smoothstep(0.5, 0.49, max(abs(uv.x - 0.5), abs(uv.y - 0.5))) * scale * (0.5 + noiseIntensity * 1.5);
 	vec2 deformedUV = uv + vec2(noiseX, noiseY) * deformationAmount;
