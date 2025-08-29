@@ -52,7 +52,7 @@ void main() {
 	float noiseScale = 15.0;
 
 	// Get a random direction that changes over time
-	vec2 randomDir = getRandomDirection(uTime*0.2, uSeed + 456.0);
+	vec2 randomDir = getRandomDirection(uTime*1.0, uSeed + 456.0);
 
 	// Apply the random direction to the original movement
 	vec2 noiseCoord = uv * noiseScale + randomDir * uTime * 0.000000000001;
