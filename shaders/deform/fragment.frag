@@ -7,6 +7,7 @@ uniform float uTime;
 uniform float uSeed;
 uniform float uOctave;
 uniform float uAmount; // deformation scale
+uniform float uNoiseScale; // noise scale
 
 float random(vec2 st, float seed) {
 	return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -49,7 +50,7 @@ void main() {
 	vec2 uv = vTexCoord;
 
 	float scale = (uAmount > 0.0) ? uAmount : 0.1;
-	float noiseScale = 15.0;
+	float noiseScale = (uNoiseScale > 0.0) ? uNoiseScale : 15.0;
 
 	// Get a random direction that changes over time
 	vec2 randomDir = getRandomDirection(uTime*1.0, uSeed + 456.0);
