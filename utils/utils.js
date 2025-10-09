@@ -409,8 +409,12 @@ function createAnimationGenerator(config) {
 		while (drawing) {
 			for (let i = 0; i < items.length; i++) {
 				const item = items[i];
-				renderItem(item, currentFrame);
-				moveItem(item, currentFrame);
+				if (renderItem) {
+					renderItem(item, currentFrame);
+				}
+				if (moveItem) {
+					moveItem(item, currentFrame);
+				}
 				operationsCompleted++;
 
 				if (count > cycleLength) {

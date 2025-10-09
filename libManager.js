@@ -17,8 +17,9 @@ class LibManager {
 			utils: "./library/utils/utils.js",
 			logs: "./library/utils/logs.js",
 			memory: "./library/utils/memoryManager.js",
-			animation: "./library/utils/animationController.js",
+			// animation: moved to utils.js as createAnimationGenerator()
 			shader: "./library/utils/shaderManager.js",
+			shaderPipeline: "./library/utils/shaderPipeline.js",
 			smudge: "./library/utils/smudge.js",
 			horizon: "./library/utils/horizon.js",
 			knob: "./library/utils/knob.js",
@@ -30,14 +31,15 @@ class LibManager {
 
 			// Application modules
 			params: "./parameters/params.js",
-			mover: "./object/mover.js",
+			mover: "./modules/mover.js",
 		};
 
 		// Define dependencies (what each module needs)
 		this.dependencies.set("utils", ["logs"]); // utils needs Logger from logs
 		this.dependencies.set("mover", ["utils", "logs"]);
-		this.dependencies.set("animation", ["logs", "memory"]);
+		// animation functionality is now in utils.js (createAnimationGenerator)
 		this.dependencies.set("shader", ["logs"]);
+		this.dependencies.set("shaderPipeline", ["shader"]);
 		this.dependencies.set("params", ["fxhash"]); // params needs fxhash
 
 		// Global exports for each module
