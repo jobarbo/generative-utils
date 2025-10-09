@@ -53,14 +53,16 @@ void main() {
 	float noiseScale = (uNoiseScale > 0.0) ? uNoiseScale : 15.0;
 
 	// Get a random direction that changes over time
-	vec2 randomDir = getRandomDirection(uTime*1.0, uSeed + 456.0);
+	vec2 randomDir = getRandomDirection(uTime*1.5, uSeed + 456.0);
 
 	// Apply the random direction to the original movement
 	vec2 noiseCoord = uv * noiseScale + randomDir * uTime * 0.000000000001;
 	float noiseX = fbm(noiseCoord, uSeed) * 2.0 - 1.0;
 	float noiseY = fbm(noiseCoord + vec2(120.0, 210.0), uSeed + 1230.0) * 2.0 - 1.0;
 	//vec2 intensityCoord = uv * 2.0 + randomDir * uTime * 0.1;
-	vec2 intensityCoord = uv * fbm(uv * 16000.0 * sin(noiseX),uSeed + 213.0) * 4.0 + uTime * 0.1; // **great washed up textures**
+	//!old line
+	//vec2 intensityCoord = uv * fbm(uv * 16000.0 * sin(noiseX),uSeed + 213.0) * 4.0 + uTime * 0.1; // **great washed up textures**
+	vec2 intensityCoord = uv + fbm(vec2(1500.0 * sin(noiseX), 11500.0 * cos(noiseX)),uSeed + 213.0) * 1.0 + randomDir * 5.0 + uTime * 1.5; // **great washed up textures**
 	float noiseIntensity = fbm(intensityCoord, uSeed + 1230.0);
 	float deformationAmount = smoothstep(0.5, 0.49, max(abs(uv.x - 0.5), abs(uv.y - 0.5))) * scale * (0.5 + noiseIntensity * 1.5);
 	vec2 deformedUV = uv + vec2(noiseX, noiseY) * deformationAmount;
