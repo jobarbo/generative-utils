@@ -10,6 +10,7 @@ An animated pixel sorting shader that creates glitch-like effects by sorting pix
 - `uAngle` (float) - Sorting direction in radians (0 = vertical, π/2 = horizontal)
 - `uThreshold` (float) - Brightness threshold for sorting (0.0 - 1.0). Pixels brighter than this will be sorted
 - `uSortAmount` (float) - Intensity of the sorting effect (0.0 = no sorting, 1.0 = full sorting)
+- `uSampleCount` (float) - Number of samples for quality (8-64). Higher = better quality but slower performance
 - `uResolution` (vec2) - Canvas resolution
 
 ## Features
@@ -32,6 +33,7 @@ pixelSortShader.apply({
 	uAngle: 0, // vertical sorting
 	uThreshold: 0.3,
 	uSortAmount: 0.8,
+	uSampleCount: 32.0,
 	uResolution: [width, height],
 });
 ```
