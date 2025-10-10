@@ -8,6 +8,7 @@ uniform float uSeed;
 uniform float uOctave;
 uniform float uAmount; // deformation scale
 uniform float uNoiseScale; // noise scale
+uniform bool uEmberMode;
 
 float random(vec2 st, float seed) {
 	return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -64,10 +65,23 @@ void main() {
 	//vec2 intensityCoord = uv * fbm(uv * 16000.0 * sin(noiseX),uSeed + 213.0) * 4.0 + uTime * 0.1; // **great washed up textures**
 	vec2 intensityCoord = uv + fbm(vec2(11500.0 * sin(noiseX), 11500.0 * cos(noiseX)),uSeed + 213.0) * 4.0 + randomDir * 1.0 + uTime * 11.5; // **great washed up textures**
 	float noiseIntensity = fbm(intensityCoord, uSeed + 1230.0);
-	float deformationAmount = smoothstep(0.5, 0.49, max(abs(uv.x - 0.5), abs(uv.y - 0.5))) * scale * (0.5 + noiseIntensity * 1.5);
-	vec2 deformedUV = uv + vec2(noiseX, noiseY) * deformationAmount;
+	float deformationAmount = smoothstep(0.99, 0.01, max(abs(uv.x - 0.5), abs(uv.y - 0.5))) * scale * (0.5 + noiseIntensity * 1.5);
+	vec2 movement = vec2(noiseX, noiseY) * deformationAmount;
+	vec2 deformedUV = uv + movement;
 
-	gl_FragColor = texture2D(uTexture, deformedUV);
+	vec4 texColor = texture2D(uTexture, deformedUV);
+
+	if (uEmberMode) {
+		// Calculate brightness based on movement magnitude (length of movement vector)
+		float movementMagnitude = length(movement);
+		// Apply smoothstep for steep contrast (adjust min/max to control range)
+		float contrastCurve = smoothstep(0.01, 0.25, movementMagnitude); // Adjust 0.1 to control steepness
+		float brightness = contrastCurve * -10.0; // Adjust multiplier to control intensity
+		texColor.rgb += brightness;
+	}
+
+
+	gl_FragColor = texColor;
 }
 
 
