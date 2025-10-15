@@ -9,18 +9,20 @@ uniform float uBrightness; // How much to brighten
 uniform float uCellSize; // Size of cells
 uniform float uGapDarkness; // CRT: Gap visibility/opacity (0.0 = no gaps visible, 1.0 = full dark gaps)
 uniform float uRgbIntensity; // CRT: RGB color separation intensity (0.0 = no separation, 1.0 = full RGB isolation)
+uniform float uDotRadius; // CRT: Size of phosphor dots (0.0-0.5, typical: 0.3-0.4)
+uniform float uDotFalloff; // CRT: Softness of phosphor dot edges (0.0-1.0, typical: 0.1-0.5)
 uniform bool uCrtMode; // true = CRT mode, false = Checkerboard mode
 
 void main() {
 	vec2 uv = vTexCoord;
-	vec4 texColor = texture2D(uTexture, uv);
-
+	
 	// Get pixel coordinates
 	vec2 pixelCoord = uv * uResolution;
 
 	if (uCrtMode) {
 		// CRT MODE: Each cell contains RGB phosphor dots arranged horizontally
 		// with alternating vertical offset (staggered pattern)
+		// Each cell samples ONE color and displays it through three RGB phosphors
 		
 		// Apply alternating vertical offset for staggered/honeycomb pattern
 		// Every other column is offset by 0.5 cells vertically
@@ -33,6 +35,14 @@ void main() {
 		// Determine which cell we're in
 		vec2 cellCoord = adjustedPixelCoord / uCellSize;
 		vec2 cellIndex = floor(cellCoord);
+		
+		// Sample color at the CENTER of the cell (not at current pixel position)
+		// This mimics how a CRT pixel displays one color through its phosphors
+		vec2 cellCenterCoord = (cellIndex + vec2(0.5)) * uCellSize;
+		// Unapply the vertical offset to get back to original coordinate space
+		vec2 originalCellCenter = vec2(cellCenterCoord.x, cellCenterCoord.y + verticalOffset);
+		vec2 cellCenterUV = originalCellCenter / uResolution;
+		vec4 cellColor = texture2D(uTexture, cellCenterUV);
 		
 		// Position within the cell (0.0 to 1.0)
 		vec2 cellPos = fract(cellCoord);
@@ -52,10 +62,8 @@ void main() {
 		vec2 dotCenter = vec2(0.5, 0.5);
 		float distFromCenter = length(subpixelPos - dotCenter);
 		
-		// Smooth circular dot with soft edges
-		float dotRadius = 0.35; // Size of the phosphor dot
-		float dotFalloff = 0.5; // Softness of the edge
-		float dotMask = smoothstep(dotRadius + dotFalloff, dotRadius - dotFalloff, distFromCenter);
+		// Smooth circular dot with soft edges (using uniforms)
+		float dotMask = smoothstep(uDotRadius + uDotFalloff, uDotRadius - uDotFalloff, distFromCenter);
 		
 		// Determine which color channel based on subpixel
 		vec3 phosphorMask = vec3(0.0);
@@ -78,8 +86,8 @@ void main() {
 		// Apply RGB color separation based on uRgbIntensity
 		// At 0.0: no RGB separation (full color on all phosphors)
 		// At 1.0: full RGB isolation (each phosphor shows only its color channel)
-		vec3 isolatedColor = texColor.rgb * phosphorMask;
-		vec3 fullColor = texColor.rgb;
+		vec3 isolatedColor = cellColor.rgb * phosphorMask;
+		vec3 fullColor = cellColor.rgb;
 		vec3 phosphorColor = mix(fullColor, isolatedColor, uRgbIntensity);
 		
 		// Boost phosphor intensity to compensate for channel isolation
@@ -90,7 +98,7 @@ void main() {
 		// Blend with base image to maintain overall brightness
 		// This adds a subtle base layer so the image isn't only visible through phosphors
 		float baseBlend = 0.3; // Amount of original image to blend in
-		crtColor = mix(crtColor, texColor.rgb * effectiveDotMask, baseBlend);
+		crtColor = mix(crtColor, cellColor.rgb * effectiveDotMask, baseBlend);
 		
 		// Very subtle scanlines (using adjusted coordinate for proper alignment)
 		float scanlineFreq = uCellSize;
@@ -104,10 +112,12 @@ void main() {
 		// Apply darkness
 		crtColor *= (1.0 - uDarkness);
 		
-		texColor.rgb = crtColor;
+		gl_FragColor = vec4(crtColor, cellColor.a);
 
 	} else {
 		// CHECKERBOARD MODE: Alternating dark/bright pixels
+		// Sample texture at current pixel for checkerboard mode
+		vec4 texColor = texture2D(uTexture, uv);
 		vec2 cellCoord = pixelCoord / uCellSize;
 
 		// Create checkerboard pattern
@@ -121,9 +131,9 @@ void main() {
 			// Brighten these pixels
 			texColor.rgb += uBrightness;
 		}
+		
+		gl_FragColor = texColor;
 	}
-
-	gl_FragColor = texColor;
 }
 
 
