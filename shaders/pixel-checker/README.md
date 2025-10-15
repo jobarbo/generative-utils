@@ -29,6 +29,8 @@ A dual-mode shader that can create either:
 ## Features
 
 - **RGB Subpixel Structure**: Each CRT pixel has 3 vertical stripes (Red, Green, Blue)
+- **Pixel Offset Pattern**: Each pixel column alternates vertical offset (0, 0.5, 0, 0.5...) while keeping RGB columns aligned
+- **Pixel Separation**: Very small gaps between pixels both horizontally and vertically, like real CRT TV
 - **Scanlines**: Subtle horizontal scanlines for authentic CRT look
 - **Resolution-aware**: Automatically adapts to canvas size
 - **Adjustable size**: Control the CRT pixel size for different viewing distances
@@ -66,6 +68,8 @@ shaderEffects.updateEffectParam("pixelChecker", "cellSize", 1.0);
 - Use `cellSize: 6.0+` for clearly visible CRT pixels (good for pixelated art)
 - Keep `darkness: 0.15-0.3` for authentic CRT look without being too dark
 - Set `brightness: 0.0` for natural look, or add slight boost (0.05-0.1) for glow
+- Pixel offset pattern creates alternating vertical positions while maintaining RGB column alignment
+- Small gaps between pixels create authentic CRT TV appearance with visible pixel separation
 - Combines well with chromatic aberration for authentic retro CRT look
 
 **Checkerboard Mode:**
