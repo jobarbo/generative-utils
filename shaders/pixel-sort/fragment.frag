@@ -9,6 +9,7 @@ uniform float uAngle; // Sorting direction in radians
 uniform float uThreshold; // Brightness threshold for sorting
 uniform float uSortAmount; // How much to sort (0.0 = none, 1.0 = full)
 uniform float uSampleCount; // Number of samples for sorting quality (higher = better quality, slower)
+uniform float uInvert; // 0.0 = sort bright pixels, 1.0 = sort dark pixels
 uniform vec2 uResolution;
 
 // Random function
@@ -45,8 +46,11 @@ void main() {
 	vec4 currentColor = texture2D(uTexture, uv);
 	float currentBrightness = getBrightness(currentColor.rgb);
 
-	// Only sort if above threshold
-	if (currentBrightness > uThreshold) {
+	// Invert brightness if in dark mode
+	float sortValue = mix(currentBrightness, 1.0 - currentBrightness, uInvert);
+
+	// Only sort if above threshold (either brightness or darkness depending on mode)
+	if (sortValue > uThreshold) {
 		// Sample along the sort direction
 		float displacement = 0.0;
 		float totalWeight = 0.0;
@@ -63,11 +67,12 @@ void main() {
 				if (sampleUV.x >= 0.0 && sampleUV.x <= 1.0 && sampleUV.y >= 0.0 && sampleUV.y <= 1.0) {
 					vec4 sampleColor = texture2D(uTexture, sampleUV);
 					float sampleBrightness = getBrightness(sampleColor.rgb);
+					float sampleSortValue = mix(sampleBrightness, 1.0 - sampleBrightness, uInvert);
 
 					// Weight based on brightness difference
-					float weight = exp(-abs(sampleBrightness - currentBrightness) * 10.0);
+					float weight = exp(-abs(sampleSortValue - sortValue) * 10.0);
 
-					displacement += offset * weight * sampleBrightness;
+					displacement += offset * weight * sampleSortValue;
 					totalWeight += weight;
 				}
 			}
