@@ -85,10 +85,30 @@ vec2 rotate(vec2 uv, float angle) {
 void main() {
 	vec2 uv = vTexCoord;
 
-	// Rotate UV based on angle to control sort direction
-	vec2 sortUV = rotate(uv, uAngle);
+	// Add organic direction variation using noise
+	// This creates smooth, flowing direction changes across space and time
+	float noiseScale = 3.0; // Scale of the noise field
+	float noiseStrength = 0.4; // How much the noise affects the direction (radians)
+	
+	// Create dynamic time-evolving flow direction using layered noise
+	// Slow global rotation
+	float globalRotation = uTime * 0.3;
+	// Local noise perturbations that evolve over time
+	float angleNoise1 = noise(uv * noiseScale + uTime * 0.15) * 2.0 - 1.0;
+	float angleNoise2 = noise(uv * noiseScale * 0.5 + uTime * 0.08) * 2.0 - 1.0;
+	
+	// Combine base angle with global rotation and layered noise
+	float organicAngle = uAngle + globalRotation + (angleNoise1 * 0.6 + angleNoise2 * 0.4) * noiseStrength;
 
-	// Get the current pixel's position along the sort axis
+	// Rotate UV based on organic angle to control sort direction
+	vec2 sortUV = rotate(uv, organicAngle);
+
+	// Create organic wave flow direction
+	// This makes the wave propagate in different directions based on noise
+	vec2 waveFlowDir = vec2(cos(organicAngle), sin(organicAngle));
+	float wavePos = dot(uv, waveFlowDir); // Position along the wave flow direction
+	
+	// Keep sortPos for compatibility, but use wavePos for wave calculations
 	float sortPos = sortUV.y;
 
 	// Select animation style based on uSortMode
@@ -97,36 +117,41 @@ void main() {
 
 	if (uSortMode < 1.5) {
 		// MODE 1: Sine wave with oscillating direction
-		wave = sin(sortPos * 10.0 + uTime * 2.0) * 0.5 + 0.5;
-		// Create oscillating 2D direction based on position
-		float directionAngle = uAngle + sin(sortPos * 8.0 + uTime) * 0.3;
+		wave = sin(wavePos * 10.0 + uTime * 2.0) * 0.5 + 0.5;
+		// Create oscillating 2D direction based on organic angle
+		float directionAngle = organicAngle + sin(wavePos * 8.0 + uTime) * 0.3;
 		displacementDirection = vec2(sin(directionAngle), cos(directionAngle));
 
 	} else if (uSortMode < 2.5) {
 		// MODE 2: Noise field with noise-based direction
-		wave = noise(vec2(sortPos * 8.0, uTime * 0.5)) * 0.5 + 0.5;
-		// Use noise to perturb the direction in 2D
+		wave = noise(vec2(wavePos * 8.0, uTime * 0.5)) * 0.5 + 0.5;
+		// Use noise to perturb the direction in 2D (combines organic base with local noise)
 		float noiseAngle = noise(sortUV * 5.0 + uTime * 0.3) * 3.14159 * 2.0;
-		float directionAngle = uAngle + noiseAngle * 0.5;
+		float directionAngle = organicAngle + noiseAngle * 0.5;
 		displacementDirection = vec2(sin(directionAngle), cos(directionAngle));
 
 	} else if (uSortMode < 3.5) {
 		// MODE 3: FBM with flow-like direction
-		wave = fbm(vec2(sortPos * 5.0, sortUV.x * 5.0), uTime);
+		// Use wavePos for primary flow, perpendicular direction for variation
+		vec2 perpDir = vec2(-sin(organicAngle), cos(organicAngle));
+		float perpPos = dot(uv, perpDir);
+		wave = fbm(vec2(wavePos * 5.0, perpPos * 5.0), uTime);
 		// Create flowing direction using noise
 		float flowX = fbm(sortUV * 3.0 + vec2(uTime * 0.2, 0.0), uTime);
 		float flowY = fbm(sortUV * 3.0 + vec2(0.0, uTime * 0.2), uTime);
 		vec2 flowDir = vec2(flowX - 0.5, flowY - 0.5);
-		// Blend base angle with flow direction
-		vec2 baseDir = vec2(sin(uAngle), cos(uAngle));
+		// Blend organic base angle with flow direction
+		vec2 baseDir = vec2(sin(organicAngle), cos(organicAngle));
 		displacementDirection = normalize(baseDir + flowDir * 0.5);
 
 	} else {
 		// MODE 4: Vector field (uses 2D position for complex patterns)
 		vec2 field = vectorField(sortUV, uTime);
 		wave = length(field);
-		// Normalize field for direction, or use a default direction
-		displacementDirection = length(field) > 0.001 ? normalize(field) : vec2(0.0, 1.0);
+		// Blend vector field with organic base angle for more coherent flow
+		vec2 organicDir = vec2(sin(organicAngle), cos(organicAngle));
+		vec2 fieldDir = length(field) > 0.001 ? normalize(field) : vec2(0.0, 1.0);
+		displacementDirection = normalize(mix(organicDir, fieldDir, 0.7)); // 70% field, 30% organic
 	}
 
 	// Sample current pixel
