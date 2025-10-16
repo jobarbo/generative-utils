@@ -96,22 +96,30 @@ void main() {
 	vec2 displacementDirection;
 
 	if (uSortMode < 1.5) {
-		// MODE 1: Original sine wave
+		// MODE 1: Sine wave with oscillating direction
 		wave = sin(sortPos * 10.0 + uTime * 2.0) * 0.5 + 0.5;
-		// Use angle-based direction for sine wave
-		displacementDirection = vec2(sin(uAngle), cos(uAngle));
+		// Create oscillating 2D direction based on position
+		float directionAngle = uAngle + sin(sortPos * 8.0 + uTime) * 0.3;
+		displacementDirection = vec2(sin(directionAngle), cos(directionAngle));
 
 	} else if (uSortMode < 2.5) {
-		// MODE 2: Simple noise field (animated)
+		// MODE 2: Noise field with noise-based direction
 		wave = noise(vec2(sortPos * 8.0, uTime * 0.5)) * 0.5 + 0.5;
-		// Use angle-based direction for noise
-		displacementDirection = vec2(sin(uAngle), cos(uAngle));
+		// Use noise to perturb the direction in 2D
+		float noiseAngle = noise(sortUV * 5.0 + uTime * 0.3) * 3.14159 * 2.0;
+		float directionAngle = uAngle + noiseAngle * 0.5;
+		displacementDirection = vec2(sin(directionAngle), cos(directionAngle));
 
 	} else if (uSortMode < 3.5) {
-		// MODE 3: Fractal Brownian Motion (FBM) - rich, organic motion
+		// MODE 3: FBM with flow-like direction
 		wave = fbm(vec2(sortPos * 5.0, sortUV.x * 5.0), uTime);
-		// Use angle-based direction for FBM
-		displacementDirection = vec2(sin(uAngle), cos(uAngle));
+		// Create flowing direction using noise
+		float flowX = fbm(sortUV * 3.0 + vec2(uTime * 0.2, 0.0), uTime);
+		float flowY = fbm(sortUV * 3.0 + vec2(0.0, uTime * 0.2), uTime);
+		vec2 flowDir = vec2(flowX - 0.5, flowY - 0.5);
+		// Blend base angle with flow direction
+		vec2 baseDir = vec2(sin(uAngle), cos(uAngle));
+		displacementDirection = normalize(baseDir + flowDir * 0.5);
 
 	} else {
 		// MODE 4: Vector field (uses 2D position for complex patterns)
