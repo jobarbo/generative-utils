@@ -10,6 +10,7 @@ uniform float uGapOpacity; // Gap opacity between phosphor dots (0.0 = no gaps, 
 uniform float uRgbOpacity; // RGB color separation opacity (0.0 = no separation, 1.0 = full isolation)
 uniform float uDotRadius; // Size of phosphor dots (0.0-0.5)
 uniform float uDotFalloff; // Softness of phosphor dot edges (0.0-1.0)
+uniform float uFilterMode; // Display mode: 0.0 = true pixel (sample at cell center), 1.0 = filter overlay (sample at actual position)
 
 void main() {
 	vec2 uv = vTexCoord;
@@ -33,13 +34,17 @@ void main() {
 	vec2 cellCoord = adjustedPixelCoord / uCellSize;
 	vec2 cellIndex = floor(cellCoord);
 	
-	// Sample color at the CENTER of the cell (not at current pixel position)
-	// This mimics how a CRT pixel displays one color through its phosphors
+	// Sample color based on display mode:
+	// Filter mode (1.0): Sample at actual pixel position (preserves detail, applies CRT as overlay)
+	// True pixel mode (0.0): Sample at cell center (mimics real CRT pixels)
 	vec2 cellCenterCoord = (cellIndex + vec2(0.5)) * uCellSize;
 	// Unapply the vertical offset to get back to original coordinate space
 	vec2 originalCellCenter = vec2(cellCenterCoord.x, cellCenterCoord.y + verticalOffset);
 	vec2 cellCenterUV = originalCellCenter / uResolution;
-	vec4 cellColor = texture2D(uTexture, cellCenterUV);
+	
+	// Interpolate between actual UV position (filter mode) and cell center (true pixel mode)
+	vec2 sampleUV = mix(cellCenterUV, uv, uFilterMode);
+	vec4 cellColor = texture2D(uTexture, sampleUV);
 	
 	// Position within the cell (0.0 to 1.0)
 	vec2 cellPos = fract(cellCoord);
