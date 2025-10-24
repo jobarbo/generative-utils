@@ -17,6 +17,7 @@ class LibManager {
 			utils: "./library/utils/utils.js",
 			logs: "./library/utils/logs.js",
 			memory: "./library/utils/memoryManager.js",
+			stopMotion: "./library/utils/stopMotionController.js",
 			// animation: moved to utils.js as createAnimationGenerator()
 			shader: "./library/utils/shaderManager.js",
 			shaderPipeline: "./library/utils/shaderPipeline.js",
@@ -181,6 +182,12 @@ class LibManager {
 			case "memory":
 				this.modules.set(moduleName, {
 					MemoryManager: window.MemoryManager,
+				});
+				break;
+
+			case "stopMotion":
+				this.modules.set(moduleName, {
+					StopMotionController: window.StopMotionController,
 				});
 				break;
 
