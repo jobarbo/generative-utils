@@ -12,25 +12,31 @@ float random(vec2 st, float seed) {
 	return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
 }
 
-// Horizontal symmetry: mirror across horizontal center line
+// Horizontal symmetry: mirror across horizontal center line (top half reflects to bottom)
 vec2 horizontalSymmetry(vec2 uv) {
 	vec2 center = vec2(0.5, 0.5);
-	vec2 mirrored = vec2(uv.x, 1.0 - uv.y);
-	return mirrored;
+	vec2 offset = uv - center;
+	// Mirror the Y coordinate across the horizontal center
+	vec2 mirrored = vec2(offset.x, abs(offset.y));
+	return mirrored + center;
 }
 
-// Vertical symmetry: mirror across vertical center line
+// Vertical symmetry: mirror across vertical center line (left half reflects to right)
 vec2 verticalSymmetry(vec2 uv) {
 	vec2 center = vec2(0.5, 0.5);
-	vec2 mirrored = vec2(1.0 - uv.x, uv.y);
-	return mirrored;
+	vec2 offset = uv - center;
+	// Mirror the X coordinate across the vertical center
+	vec2 mirrored = vec2(abs(offset.x), offset.y);
+	return mirrored + center;
 }
 
-// 2-line symmetry: mirror across both horizontal and vertical center lines
+// 2-line symmetry: mirror across both horizontal and vertical center lines (one quadrant reflects to all four)
 vec2 twoLineSymmetry(vec2 uv) {
 	vec2 center = vec2(0.5, 0.5);
-	vec2 mirrored = vec2(1.0 - uv.x, 1.0 - uv.y);
-	return mirrored;
+	vec2 offset = uv - center;
+	// Mirror both X and Y coordinates
+	vec2 mirrored = vec2(abs(offset.x), abs(offset.y));
+	return mirrored + center;
 }
 
 // 4-line symmetry: create 4 quadrants with symmetry
