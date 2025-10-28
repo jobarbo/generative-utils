@@ -5,13 +5,14 @@ varying vec2 vTexCoord;
 uniform sampler2D uTexture;
 uniform vec2 uResolution;
 uniform float uSeed;
-uniform float uSymmetryMode; // 0=horizontal, 1=vertical, 2=2-line, 3=4-line, 4=8-line, 5=radial
+uniform float uSymmetryMode; // 0=horizontal, 1=vertical, 2=2-line, 3=4-line, 4=8-line, 5=16-line, 6=radial
 uniform float uAmount; // blend strength [0..1]
 uniform float uDebug; // 0.0 = normal, 1.0 = debug mode
 uniform float uTime; // time for animation
 uniform float uTranslationSpeed; // speed of horizontal/vertical movement
 uniform float uRotationSpeed; // speed of rotation
 uniform float uRotationOscillationSpeed; // speed of oscillation (controls how fast it alternates between positive/negative)
+uniform float uRotationStartingAngle; // starting angle for rotation (in radians, added to rotation)
 uniform float uTranslationMode; // 0=sine, 1=noise, 2=FBM, 3=vector field
 uniform float uRotationMode; // 0=cosine, 1=noise, 2=FBM
 uniform float uTranslationNoiseScale; // scale of noise variation (lower = smoother, higher = more frequent changes)
@@ -127,6 +128,35 @@ vec2 eightLineSymmetry(vec2 uv) {
 	return folded + center;
 }
 
+// 16-line symmetry: create 16 sections with smoother transitions
+vec2 sixteenLineSymmetry(vec2 uv) {
+	vec2 center = vec2(0.5, 0.5);
+	vec2 offset = uv - center;
+
+	// Take absolute values to fold into one quadrant (creates 4-fold)
+	vec2 absOffset = abs(offset);
+
+	// Create 8-fold symmetry by folding across main diagonal
+	vec2 folded8 = (absOffset.x < absOffset.y) ? vec2(absOffset.y, absOffset.x) : absOffset;
+
+	// For smooth 16-fold: use the angle to create a subtle additional fold
+	// Instead of a harsh swap, we gradually blend toward the fold
+	float angle = atan(folded8.y, folded8.x);
+	float radius = length(folded8);
+	
+	// Normalize angle to [0, PI/4] range for the octant
+	float octantAngle = mod(angle, 3.14159265 / 4.0);
+	
+	// Create 16 sections by treating the octant as a 2-fold symmetric region
+	// Fold angle back into [0, PI/8] range
+	float foldedAngle = min(octantAngle, 3.14159265 / 4.0 - octantAngle);
+	
+	// Convert back to Cartesian
+	vec2 folded16 = vec2(cos(foldedAngle), sin(foldedAngle)) * radius;
+
+	return folded16 + center;
+}
+
 // Radial symmetry: create radial pattern
 vec2 radialSymmetry(vec2 uv) {
 	vec2 center = vec2(0.5, 0.5);
@@ -135,7 +165,7 @@ vec2 radialSymmetry(vec2 uv) {
 	// Take absolute values to fold into one quadrant
 	vec2 absOffset = abs(offset);
 
-	// Fold along multiple diagonals to create 16-fold symmetry
+	// Fold along multiple diagonals to create radial symmetry
 	// First fold along main diagonal
 	vec2 folded1 = (absOffset.x < absOffset.y) ? vec2(absOffset.y, absOffset.x) : absOffset;
 
@@ -168,6 +198,8 @@ void main() {
 	} else if (mode == 4) {
 		symmetricUV = eightLineSymmetry(uv);
 	} else if (mode == 5) {
+		symmetricUV = sixteenLineSymmetry(uv);
+	} else if (mode == 6) {
 		symmetricUV = radialSymmetry(uv);
 	} else {
 		// Default to horizontal symmetry
@@ -237,6 +269,9 @@ void main() {
 		rotationAngle = oscillation * uRotationSpeed;
 	}
 	
+	// Add starting angle to the rotation
+	rotationAngle += uRotationStartingAngle;
+	
 	float cosAngle = cos(rotationAngle);
 	float sinAngle = sin(rotationAngle);
 	
@@ -302,6 +337,29 @@ void main() {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 5) {
+			// Horizontal, vertical, diagonal lines, and lines at 22.5/67.5 degrees (16-fold)
+			// Get offset from center
+			vec2 offset = uv - vec2(0.5);
+			vec2 absOffset = abs(offset);
+			float angle = atan(absOffset.y, absOffset.x);
+			float radius = length(offset);
+			
+			// Center cross lines (horizontal and vertical)
+			bool centerCross = abs(uv.y - 0.5) < lineThickness || abs(uv.x - 0.5) < lineThickness;
+			
+			// Diagonal lines at 45 degrees (from 8-fold)
+			bool diagonals = abs(uv.x - uv.y) < lineThickness || abs(uv.x + uv.y - 1.0) < lineThickness;
+			
+			// Lines at 22.5 and 67.5 degrees (for 16-fold)
+			float tan22_5 = 0.41421356;
+			float tan67_5 = 2.41421356;
+			bool lines22_5 = abs(absOffset.y - absOffset.x * tan22_5) < lineThickness * 0.5;
+			bool lines67_5 = abs(absOffset.x - absOffset.y * tan22_5) < lineThickness * 0.5;
+			
+			if (centerCross || diagonals || lines22_5 || lines67_5) {
+				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
+			}
+		} else if (mode == 6) {
 			// Radial - draw center circle and radial lines
 			// Center circle
 			if (distFromCenter > 0.02 && distFromCenter < 0.025) {
