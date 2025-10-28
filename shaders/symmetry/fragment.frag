@@ -8,6 +8,8 @@ uniform float uSeed;
 uniform float uSymmetryMode; // 0=horizontal, 1=vertical, 2=2-line, 3=4-line, 4=8-line, 5=radial
 uniform float uAmount; // blend strength [0..1]
 uniform float uDebug; // 0.0 = normal, 1.0 = debug mode
+uniform float uTime; // time for animation
+uniform float uRotationSpeed; // movement speed for kaleidoscope animation
 
 float random(vec2 st, float seed) {
 	return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -99,7 +101,7 @@ void main() {
 	vec2 uv = vTexCoord;
 	vec4 originalColor = texture2D(uTexture, uv);
 
-	// Determine which symmetry mode to apply
+	// Determine which symmetry mode to apply (keep folds stable)
 	vec2 symmetricUV;
 	int mode = int(uSymmetryMode);
 
@@ -120,10 +122,21 @@ void main() {
 		symmetricUV = horizontalSymmetry(uv);
 	}
 
-	// Clamp UV coordinates to prevent sampling outside texture bounds
-	symmetricUV = clamp(symmetricUV, 0.0, 1.0);
+	// Apply translation to the source image - this moves the image under the symmetry
+	// The symmetry folds stay in the same place, but different parts of the image pass through
+	float time = uTime * uRotationSpeed;
+	vec2 offset = vec2(
+		sin(time) * 0.3,  // horizontal movement
+		cos(time * 0.7) * 0.3  // vertical movement
+	);
 
-	vec4 symmetricColor = texture2D(uTexture, symmetricUV);
+	// Offset the texture sampling (not the UV coordinates before symmetry)
+	vec2 sourceUV = fract(symmetricUV + offset);
+
+	// Clamp UV coordinates to prevent sampling outside texture bounds
+	sourceUV = clamp(sourceUV, 0.0, 1.0);
+
+	vec4 symmetricColor = texture2D(uTexture, sourceUV);
 
 	// Blend between original and symmetric version
 	float blendAmount = clamp(uAmount, 0.0, 1.0);
