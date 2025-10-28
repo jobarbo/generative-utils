@@ -311,27 +311,35 @@ function createDownloadButtonUI() {
 	const downloadButton = document.createElement("button");
 	downloadButton.id = "download-button";
 	downloadButton.textContent = "Download";
-	downloadButton.style.cssText = `
-		position: fixed;
-		top: 20px;
-		right: 20px;
-		z-index: 1000;
-		background: rgba(0, 0, 0, 0.8);
-		color: white;
-		border: none;
-		border-radius: 8px;
-		padding: 12px 20px;
-		font-size: 16px;
-		cursor: pointer;
-	`;
+	// Add button class for styling consistency
+	downloadButton.className = "control-button";
 
 	// Add click handler
 	downloadButton.addEventListener("click", () => {
 		saveArtwork();
 	});
 
-	// Add button to body
-	document.body.appendChild(downloadButton);
+	// Add button to mobile controls container if it exists, otherwise to body
+	const controls = document.getElementById("controls");
+	if (controls) {
+		controls.appendChild(downloadButton);
+	} else {
+		// Fallback: add to body with inline styles
+		downloadButton.style.cssText = `
+			position: fixed;
+			top: 20px;
+			right: 20px;
+			z-index: 1000;
+			background: rgba(0, 0, 0, 0.8);
+			color: white;
+			border: none;
+			border-radius: 8px;
+			padding: 12px 20px;
+			font-size: 16px;
+			cursor: pointer;
+		`;
+		document.body.appendChild(downloadButton);
+	}
 }
 
 function max(a, b) {
