@@ -7,6 +7,7 @@ uniform vec2 uResolution;
 uniform float uSeed;
 uniform float uSymmetryMode; // 0=horizontal, 1=vertical, 2=2-line, 3=4-line, 4=8-line, 5=radial
 uniform float uAmount; // blend strength [0..1]
+uniform float uDebug; // 0.0 = normal, 1.0 = debug mode
 
 float random(vec2 st, float seed) {
 	return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -128,5 +129,55 @@ void main() {
 	float blendAmount = clamp(uAmount, 0.0, 1.0);
 	vec4 finalColor = mix(originalColor, symmetricColor, blendAmount);
 
-	gl_FragColor = finalColor;
+	// Debug mode: draw fold lines and center point
+	if (uDebug > 0.5) {
+		vec4 debugColor = finalColor;
+
+		// Draw center point
+		float distFromCenter = distance(uv, vec2(0.5));
+		if (distFromCenter < 0.005) {
+			debugColor = vec4(1.0, 0.0, 0.0, 1.0); // Red center point
+		}
+
+		// Draw fold lines based on symmetry mode
+		float lineThickness = 0.002;
+
+		if (mode == 0) {
+			// Horizontal line
+			if (abs(uv.y - 0.5) < lineThickness) {
+				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
+			}
+		} else if (mode == 1) {
+			// Vertical line
+			if (abs(uv.x - 0.5) < lineThickness) {
+				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
+			}
+		} else if (mode == 2) {
+			// Both horizontal and vertical lines
+			if (abs(uv.y - 0.5) < lineThickness || abs(uv.x - 0.5) < lineThickness) {
+				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
+			}
+		} else if (mode == 3) {
+			// Both horizontal and vertical lines
+			if (abs(uv.y - 0.5) < lineThickness || abs(uv.x - 0.5) < lineThickness) {
+				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
+			}
+		} else if (mode == 4) {
+			// Horizontal, vertical, and two diagonal lines (8-fold)
+			if (abs(uv.y - 0.5) < lineThickness || abs(uv.x - 0.5) < lineThickness ||
+				abs(uv.x - uv.y) < lineThickness || abs(uv.x + uv.y - 1.0) < lineThickness) {
+				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
+			}
+		} else if (mode == 5) {
+			// Radial - draw center circle and radial lines
+			// Center circle
+			if (distFromCenter > 0.02 && distFromCenter < 0.025) {
+				debugColor = vec4(0.0, 0.0, 1.0, 1.0); // Blue circle
+			}
+		}
+
+		gl_FragColor = debugColor;
+	} else {
+		gl_FragColor = finalColor;
+	}
 }

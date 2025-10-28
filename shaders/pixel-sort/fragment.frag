@@ -1,4 +1,4 @@
-precision mediump float;
+precision highp float;
 
 varying vec2 vTexCoord;
 
@@ -12,6 +12,10 @@ uniform float uSampleCount; // Number of samples for sorting quality (higher = b
 uniform float uInvert; // 0.0 = sort bright pixels, 1.0 = sort dark pixels
 uniform float uSortMode; // 1.0 = sine wave, 2.0 = noise, 3.0 = FBM, 4.0 = vector field
 uniform vec2 uResolution;
+
+// Constants for performance
+const float MIN_WEIGHT_THRESHOLD = 0.001;
+const float INV_SAMPLE_SCALE = 0.015625; // 1.0/64.0 pre-calculated
 
 // Random function
 float random(vec2 st, float seed) {
@@ -37,18 +41,16 @@ float noise(vec2 st) {
 		   (d - b) * u.x * u.y;
 }
 
-// Fractal Brownian Motion (layered noise)
+// Fractal Brownian Motion (layered noise) - Optimized with unrolled loop
 float fbm(vec2 st, float time) {
-	float value = 0.0;
-	float amplitude = 0.5;
-	float frequency = 1.0;
+	float timeOffset = time * 0.3;
 
-	// Add multiple octaves
-	for(int i = 0; i < 4; i++) {
-		value += amplitude * noise(st * frequency + time * 0.3);
-		frequency *= 2.0;
-		amplitude *= 0.5;
-	}
+	// Unroll loop for better performance
+	float value = 0.5 * noise(st + timeOffset);
+	value += 0.25 * noise(st * 2.0 + timeOffset);
+	value += 0.125 * noise(st * 4.0 + timeOffset);
+	value += 0.0625 * noise(st * 8.0 + timeOffset);
+
 	return value;
 }
 
@@ -89,14 +91,14 @@ void main() {
 	// This creates smooth, flowing direction changes across space and time
 	float noiseScale = 3.0; // Scale of the noise field
 	float noiseStrength = 0.4; // How much the noise affects the direction (radians)
-	
+
 	// Create dynamic time-evolving flow direction using layered noise
 	// Slow global rotation
 	float globalRotation = uTime * 0.3;
 	// Local noise perturbations that evolve over time
 	float angleNoise1 = noise(uv * noiseScale + uTime * 0.15) * 2.0 - 1.0;
 	float angleNoise2 = noise(uv * noiseScale * 0.5 + uTime * 0.08) * 2.0 - 1.0;
-	
+
 	// Combine base angle with global rotation and layered noise
 	float organicAngle = uAngle + globalRotation + (angleNoise1 * 0.6 + angleNoise2 * 0.4) * noiseStrength;
 
@@ -107,7 +109,7 @@ void main() {
 	// This makes the wave propagate in different directions based on noise
 	vec2 waveFlowDir = vec2(cos(organicAngle), sin(organicAngle));
 	float wavePos = dot(uv, waveFlowDir); // Position along the wave flow direction
-	
+
 	// Keep sortPos for compatibility, but use wavePos for wave calculations
 	float sortPos = sortUV.y;
 
@@ -163,6 +165,11 @@ void main() {
 
 	// Only sort if above threshold (either brightness or darkness depending on mode)
 	if (sortValue > uThreshold) {
+		// Pre-calculate constants outside the loop
+		float invSampleCount = 1.0 / uSampleCount;
+		float offsetScale = 0.3 * invSampleCount;
+		vec2 displacementScaled = displacementDirection * wave * uSortAmount;
+
 		// Sample along the sort direction
 		float displacement = 0.0;
 		float totalWeight = 0.0;
@@ -171,29 +178,35 @@ void main() {
 		// Loop has fixed max of 64, but actual samples controlled by uSampleCount
 		for (float i = 0.0; i < 64.0; i++) {
 			// Only process if within the desired sample count
-			if (i < uSampleCount) {
-				float offset = (i / uSampleCount - 0.5) * 0.3;
-				// Use 2D displacement direction from vector field
-				vec2 sampleUV = uv + displacementDirection * offset * wave * uSortAmount;
+			if (i >= uSampleCount) break; // Early exit optimization
 
-				// Clamp to valid UV range
-				if (sampleUV.x >= 0.0 && sampleUV.x <= 1.0 && sampleUV.y >= 0.0 && sampleUV.y <= 1.0) {
-					vec4 sampleColor = texture2D(uTexture, sampleUV);
-					float sampleBrightness = getBrightness(sampleColor.rgb);
-					float sampleSortValue = mix(sampleBrightness, 1.0 - sampleBrightness, uInvert);
+			// Pre-calculate offset (moved division outside critical path)
+			float offset = (i * invSampleCount - 0.5) * 0.3;
 
-					// Weight based on brightness difference
-					float weight = exp(-abs(sampleSortValue - sortValue) * 10.0);
+			// Use 2D displacement direction from vector field
+			vec2 sampleUV = uv + displacementScaled * offset;
 
-					displacement += offset * weight * sampleSortValue;
-					totalWeight += weight;
-				}
+			// Clamp to valid UV range - using clamp is faster than if statements
+			sampleUV = clamp(sampleUV, 0.0, 1.0);
+
+			vec4 sampleColor = texture2D(uTexture, sampleUV);
+			float sampleBrightness = getBrightness(sampleColor.rgb);
+			float sampleSortValue = mix(sampleBrightness, 1.0 - sampleBrightness, uInvert);
+
+			// Optimized weight calculation - use faster approximation
+			// Replace exp() with polynomial approximation for better performance
+			float diff = abs(sampleSortValue - sortValue) * 10.0;
+			float weight = 1.0 / (1.0 + diff * diff); // Faster than exp()
+
+			// Early skip if weight is too small
+			if (weight > MIN_WEIGHT_THRESHOLD) {
+				displacement += offset * weight * sampleSortValue;
+				totalWeight += weight;
 			}
 		}
 
-		if (totalWeight > 0.0) {
-			displacement /= totalWeight;
-		}
+		// Avoid division by zero and normalize
+		displacement = totalWeight > 0.0 ? displacement / totalWeight : 0.0;
 
 		// Apply animated displacement in 2D using the vector field direction
 		vec2 sortedUV = uv + displacementDirection * displacement * uSortAmount * wave;
