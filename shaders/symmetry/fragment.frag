@@ -131,9 +131,10 @@ void main() {
 	);
 
 	// Offset the texture sampling (not the UV coordinates before symmetry)
+	// Use fract() to wrap around smoothly and ensure UVs stay within bounds
 	vec2 sourceUV = fract(symmetricUV + offset);
 
-	// Clamp UV coordinates to prevent sampling outside texture bounds
+	// Ensure sourceUV is clamped to valid texture coordinates
 	sourceUV = clamp(sourceUV, 0.0, 1.0);
 
 	vec4 symmetricColor = texture2D(uTexture, sourceUV);
