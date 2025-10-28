@@ -24,7 +24,7 @@ class ShaderPipeline {
 		} else {
 			// Only create 2 buffers when we actually need ping-pong (2+ effects)
 			// Safari mobile fallback - divide by 2 for better performance
-			const bufferDivisor = isSafariMobile() ? 2 : 1;
+			const bufferDivisor = isSafariMobile() ? 4 : 1;
 			this.buffers = [this.shaderManager.createBuffer(width / bufferDivisor, height / bufferDivisor), this.shaderManager.createBuffer(width / bufferDivisor, height / bufferDivisor)];
 		}
 
