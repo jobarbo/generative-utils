@@ -17,8 +17,8 @@ void main() {
 
 	float amount = clamp(uAmount, 0.0, 1.0);
 
-	vec2 noise_uv = uv * 52.0;
-	float angle = -0.25;
+	vec2 noise_uv = uv * 128.0;
+	float angle = 0.25;
 	float cos_a = cos(angle);
 	float sin_a = sin(angle);
 	noise_uv = vec2(
@@ -40,7 +40,7 @@ void main() {
 	float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
 	float grainMask = 1.0 - abs(luminance - 0.5) * 2.0;
 	grainMask = smoothstep(0.0, 1.0, grainMask);
-	color.rgb += grainValue * amount * grainMask * 0.4;
+	color.rgb += grainValue * amount * grainMask * 0.04;
 
 	gl_FragColor = color;
 }
