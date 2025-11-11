@@ -7,6 +7,8 @@ let circlex, circley, circlew;
 let velx = 0;
 let vely = 0;
 
+let currentPage = 0;
+
 if (navigator.requestMIDIAccess) {
 	navigator.requestMIDIAccess().then(function (midi) {
 		const inputs = midi.inputs.values();
@@ -16,10 +18,35 @@ if (navigator.requestMIDIAccess) {
 		console.log(xtouch);
 
 		xtouch.onmidimessage = ({data}) => {
-			const knobValue = (data[2] / 128) * 100; // Calculate knob value as percentage
-			knob[data[1]] = knobValue;
+			const [status, controller, value] = data;
+
+			const channel = status & 0x0f; // 0..15
+			currentPage = channel;
+			console.log(`Page ${currentPage + 1}`);
+
+			if (controller < 0) {
+				return;
+			}
+
+			const knobValue = (value / 127) * 100;
+			knob[controller] = knobValue;
 			kval = knobValue;
-			kname = data[1];
+			kname = controller;
+			console.log(`Controller ${controller}, value ${value}`);
+
+			if (controller === 32) {
+				const angle = (value / 127) * Math.PI * 2;
+				if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+					shaderEffects.updateEffectParam("symmetry2", "rotationStartingAngle", angle);
+				}
+			}
+
+			if (controller === 33) {
+				const angle = (value / 127) * Math.PI * 2;
+				if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+					shaderEffects.updateEffectParam("symmetry", "rotationStartingAngle", angle);
+				}
+			}
 		};
 	});
 }
