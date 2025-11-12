@@ -36,7 +36,7 @@ if (navigator.requestMIDIAccess) {
 
 			if (currentPage === 0) {
 				if (controller === 32) {
-					const angle = map(value, 0, 127, 0, 3.14159 * 2, true);
+					const angle = map(value, 0, 127, 0, 1.14159 * 2, true);
 					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
 						shaderEffects.updateEffectParam("symmetry", "rotationStartingAngle", angle);
 					}
@@ -69,6 +69,22 @@ if (navigator.requestMIDIAccess) {
 					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
 						console.log("sampleCount", angle);
 						shaderEffects.updateEffectParam("pixelSort", "sampleCount", angle);
+					}
+				}
+
+				if (controller === 37) {
+					const angle = map(value, 0, 127, 0, 5, true);
+					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+						console.log("translationSpeed", angle);
+						shaderEffects.updateEffectParam("symmetry", "translationSpeed", angle);
+					}
+				}
+
+				if (controller === 38) {
+					const angle = map(value, 0, 127, 0, 150, true);
+					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+						console.log("rotationSpeed", angle);
+						shaderEffects.updateEffectParam("symmetry", "rotationSpeed", angle);
 					}
 				}
 			}
