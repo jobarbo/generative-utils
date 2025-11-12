@@ -34,17 +34,42 @@ if (navigator.requestMIDIAccess) {
 			kname = controller;
 			console.log(`Controller ${controller}, value ${value}`);
 
-			if (controller === 32) {
-				const angle = (value / 127) * Math.PI * 2;
-				if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-					shaderEffects.updateEffectParam("symmetry2", "rotationStartingAngle", angle);
+			if (currentPage === 0) {
+				if (controller === 32) {
+					const angle = map(value, 0, 127, 0, 3.14159 * 2, true);
+					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+						shaderEffects.updateEffectParam("symmetry", "rotationStartingAngle", angle);
+					}
 				}
-			}
 
-			if (controller === 33) {
-				const angle = (value / 127) * Math.PI * 2;
-				if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-					shaderEffects.updateEffectParam("symmetry", "rotationStartingAngle", angle);
+				if (controller === 33) {
+					const angle = map(value, 0, 127, 0, 1, true);
+					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+						shaderEffects.updateEffectParam("pixelSort", "invert", angle);
+					}
+				}
+
+				if (controller === 34) {
+					const angle = map(value, 0, 127, 0, 1, true);
+					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+						console.log("threshold", angle);
+						shaderEffects.updateEffectParam("pixelSort", "threshold", angle);
+					}
+				}
+
+				if (controller === 35) {
+					const angle = map(value, 0, 127, 0, 127, true);
+					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+						shaderEffects.updateEffectParam("pixelSort", "sortAmount", angle);
+					}
+				}
+
+				if (controller === 36) {
+					const angle = int(map(value, 0, 127, 1, 64, true));
+					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+						console.log("sampleCount", angle);
+						shaderEffects.updateEffectParam("pixelSort", "sampleCount", angle);
+					}
 				}
 			}
 		};
