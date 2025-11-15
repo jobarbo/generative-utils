@@ -214,41 +214,45 @@ void main() {
 	// The symmetry folds stay in the same place, but different parts of the image pass through
 
 	// Translation: apply mode-based offset (affects entire canvas uniformly, no per-pixel deformation)
-	vec2 offset;
-	float noiseTime = uTime * uTranslationNoiseScale; // Time for noise sampling (controls variation frequency)
-	float moveAmount = 1.0; // Fixed amplitude - speed controls phase accumulation rate, not amplitude
-	int transMode = int(uTranslationMode);
+	vec2 offset = vec2(0.0);
 
-	if (transMode == 0) {
-		// Sine wave mode - use accumulated phase to prevent position jumps when speed changes
-		offset = vec2(
-			sin(uTranslationPhaseX) * 0.3,
-			cos(uTranslationPhaseY) * 0.3
-		);
-	} else if (transMode == 1) {
-		// Noise influences movement direction and speed (global, not per-pixel)
-		// Use phase to control sampling time, maintaining position continuity when speed changes
-		// Phase represents accumulated time offset, so we add it to noiseTime
-		float noiseX = noise(vec2(uTranslationPhaseX, 0.0)) * 2.0 - 1.0;
-		float noiseY = noise(vec2(uTranslationPhaseY, 100.0)) * 2.0 - 1.0;
-		offset = vec2(noiseX, noiseY) * moveAmount;
-	} else if (transMode == 2) {
-		// FBM influences movement (global, not per-pixel)
-		// Use phase to control sampling time, maintaining position continuity when speed changes
-		float fbmX = fbm(vec2(uTranslationPhaseX, 0.0), uTranslationPhaseX) * 2.0 - 1.0;
-		float fbmY = fbm(vec2(uTranslationPhaseY, 100.0), uTranslationPhaseY) * 2.0 - 1.0;
-		offset = vec2(fbmX, fbmY) * moveAmount;
-	} else if (transMode == 3) {
-		// Vector field at center influences movement (global, not per-pixel)
-		// Use phase to control sampling time, maintaining position continuity when speed changes
-		vec2 vf = vectorField(vec2(0.5), uTranslationPhaseX);
-		offset = vf * moveAmount;
-	} else {
-		// Default to sine - use accumulated phase to prevent position jumps when speed changes
-		offset = vec2(
-			sin(uTranslationPhaseX) * 0.3,
-			cos(uTranslationPhaseY) * 0.3
-		);
+	// Only apply translation if speed is non-zero
+	if (abs(uTranslationSpeed) > 0.001) {
+		float noiseTime = uTime * uTranslationNoiseScale; // Time for noise sampling (controls variation frequency)
+		float moveAmount = 1.0; // Fixed amplitude - speed controls phase accumulation rate, not amplitude
+		int transMode = int(uTranslationMode);
+
+		if (transMode == 0) {
+			// Sine wave mode - use accumulated phase to prevent position jumps when speed changes
+			offset = vec2(
+				sin(uTranslationPhaseX) * 0.3,
+				cos(uTranslationPhaseY) * 0.3
+			);
+		} else if (transMode == 1) {
+			// Noise influences movement direction and speed (global, not per-pixel)
+			// Use phase to control sampling time, maintaining position continuity when speed changes
+			// Phase represents accumulated time offset, so we add it to noiseTime
+			float noiseX = noise(vec2(uTranslationPhaseX, 0.0)) * 2.0 - 1.0;
+			float noiseY = noise(vec2(uTranslationPhaseY, 100.0)) * 2.0 - 1.0;
+			offset = vec2(noiseX, noiseY) * moveAmount;
+		} else if (transMode == 2) {
+			// FBM influences movement (global, not per-pixel)
+			// Use phase to control sampling time, maintaining position continuity when speed changes
+			float fbmX = fbm(vec2(uTranslationPhaseX, 0.0), uTranslationPhaseX) * 2.0 - 1.0;
+			float fbmY = fbm(vec2(uTranslationPhaseY, 100.0), uTranslationPhaseY) * 2.0 - 1.0;
+			offset = vec2(fbmX, fbmY) * moveAmount;
+		} else if (transMode == 3) {
+			// Vector field at center influences movement (global, not per-pixel)
+			// Use phase to control sampling time, maintaining position continuity when speed changes
+			vec2 vf = vectorField(vec2(0.5), uTranslationPhaseX);
+			offset = vf * moveAmount;
+		} else {
+			// Default to sine - use accumulated phase to prevent position jumps when speed changes
+			offset = vec2(
+				sin(uTranslationPhaseX) * 0.3,
+				cos(uTranslationPhaseY) * 0.3
+			);
+		}
 	}
 
 	// Rotation: apply mode-based angle (affects entire canvas uniformly, no per-pixel deformation)
