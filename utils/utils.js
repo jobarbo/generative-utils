@@ -386,6 +386,12 @@ function showLoadingBar(elapsedTime, maxFrames, renderStart, framesRendered) {
 
 	// put the percent in the title of the page
 	document.title = percent.toFixed(0) + "% - Time left : " + timeDisplay;
+
+	// Update shader system with loading progress if available
+	if (typeof shaderEffects !== "undefined" && shaderEffects.setLoadingProgress) {
+		const progressNormalized = percent / 100.0; // Convert 0-100 to 0.0-1.0
+		shaderEffects.setLoadingProgress(progressNormalized);
+	}
 }
 
 /**
