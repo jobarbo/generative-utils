@@ -58,7 +58,7 @@ if (navigator.requestMIDIAccess) {
 				}
 
 				if (controller === 35) {
-					const angle = map(value, 0, 127, 0, 127, true);
+					const angle = map(value, 0, 127, 0, 10, true);
 					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
 						shaderEffects.updateEffectParam("pixelSort", "sortAmount", angle);
 					}
@@ -73,7 +73,7 @@ if (navigator.requestMIDIAccess) {
 				}
 
 				if (controller === 37) {
-					const angle = map(value, 0, 127, 0, 5, true);
+					const angle = map(value, 0, 127, 0.1, 5, true);
 					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
 						console.log("translationSpeed", angle);
 						shaderEffects.updateEffectParam("symmetry", "translationSpeed", angle);
@@ -81,10 +81,18 @@ if (navigator.requestMIDIAccess) {
 				}
 
 				if (controller === 38) {
-					const angle = map(value, 0, 127, 0, 150, true);
+					const angle = map(value, 0, 127, 0.1, 150, true);
 					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
 						console.log("rotationSpeed", angle);
 						shaderEffects.updateEffectParam("symmetry", "rotationSpeed", angle);
+					}
+				}
+
+				if (controller === 39) {
+					const timeMultiplier = map(value, 0, 127, 0.0001, 0.1, true);
+					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+						console.log("timeMultiplier", timeMultiplier);
+						shaderEffects.updateEffectParam("symmetry", "timeMultiplier", timeMultiplier);
 					}
 				}
 			}
