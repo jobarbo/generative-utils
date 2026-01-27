@@ -9,6 +9,7 @@ uniform float uOctave;
 uniform float uAmount; // deformation scale
 uniform float uNoiseScale; // noise scale
 uniform bool uEmberMode;
+uniform float uResolutionScale; // 0..1 quality scaler (affects fbm octaves)
 
 float random(vec2 st, float seed) {
 	return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -28,11 +29,13 @@ float noise(vec2 st, float seed) {
 float fbm(vec2 st, float seed) {
 	float value = 0.0;
 	float amplitude = 0.5;
+	int maxOctaves = int(clamp(floor(uOctave * uResolutionScale + 0.5), 1.0, 8.0));
 
-	// Use a fixed loop with step function to control octaves
 	for (int i = 0; i < 8; i++) {
-		float step = step(float(i), uOctave);
-		value += step * amplitude * noise(st, seed);
+		if (i >= maxOctaves) {
+			break;
+		}
+		value += amplitude * noise(st, seed);
 		st *= 2.0;
 		amplitude *= 0.5;
 	}
@@ -52,9 +55,10 @@ void main() {
 
 	float scale = (uAmount > 0.0) ? uAmount : 0.1;
 	float noiseScale = (uNoiseScale > 0.0) ? uNoiseScale : 15.0;
+	float quality = clamp(uResolutionScale, 0.1, 1.0);
 
 	// Get a random direction that changes over time
-	vec2 randomDir = getRandomDirection(uTime*1.5, uSeed + 456.0);
+	vec2 randomDir = getRandomDirection(uTime * 1.5, uSeed + 456.0);
 
 	// Apply the random direction to the original movement
 	vec2 noiseCoord = uv * noiseScale + randomDir * uTime * 0.000000000001;
@@ -63,9 +67,9 @@ void main() {
 	//vec2 intensityCoord = uv * 2.0 + randomDir * uTime * 0.1;
 	//!old line
 	//vec2 intensityCoord = uv * fbm(uv * 16000.0 * sin(noiseX),uSeed + 213.0) * 4.0 + uTime * 0.1; // **great washed up textures**
-	vec2 intensityCoord = uv + fbm(vec2(11500.0 * sin(noiseX), 11500.0 * cos(noiseX)),uSeed + 213.0) * 4.0 + randomDir * 1.0 + uTime * 11.5; // **great washed up textures**
+	vec2 intensityCoord = uv + fbm(vec2(11500.0 * sin(noiseX), 11500.0 * cos(noiseX)), uSeed + 213.0) * 4.0 + randomDir * 1.0 + uTime * 11.5;
 	float noiseIntensity = fbm(intensityCoord, uSeed + 1230.0);
-	float deformationAmount = smoothstep(0.99, 0.01, max(abs(uv.x - 0.5), abs(uv.y - 0.5))) * scale * (0.5 + noiseIntensity * 1.5);
+	float deformationAmount = smoothstep(0.99, 0.01, max(abs(uv.x - 0.5), abs(uv.y - 0.5))) * scale * (0.5 + noiseIntensity * (0.5 + quality));
 	vec2 movement = vec2(noiseX, noiseY) * deformationAmount;
 	vec2 deformedUV = uv + movement;
 
