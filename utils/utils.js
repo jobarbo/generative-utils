@@ -67,7 +67,7 @@ n3 = (
 	i, // (x,y,z) = coordinate, s = scale, i = noise offset index
 	xi = floor((x = x * s + no[(i *= 3)])), // (xi,yi,zi) = integer coordinates
 	yi = floor((y = y * s + no[i + 1])),
-	zi = floor((z = z * s + no[i + 2]))
+	zi = floor((z = z * s + no[i + 2])),
 ) => (
 	(x -= xi),
 	(y -= yi),
@@ -101,7 +101,7 @@ n2 = (
 	c = nc[i] * s,
 	n = ns[i] * s,
 	xi = floor((([x, y] = [(x - noiseCanvasWidth / 2) * c + (y - noiseCanvasHeight * 2) * n + nox[i], (y - noiseCanvasHeight * 2) * c - (x - noiseCanvasWidth / 2) * n + noy[i]]), x)),
-	yi = floor(y) // (x,y) = coordinate, s = scale, i = noise offset index
+	yi = floor(y), // (x,y) = coordinate, s = scale, i = noise offset index
 ) => (
 	(x -= xi),
 	(y -= yi),
@@ -179,6 +179,60 @@ function sdf_circle([x, y], [cx, cy], r) {
 	x -= cx;
 	y -= cy;
 	return L(x, y) - r;
+}
+
+function sdf_pentagon([x, y], [cx, cy], r, cornerRadius = 0) {
+	// Translate point relative to center
+	x -= cx;
+	y -= cy;
+
+	// Rotate pentagon so vertex points up (standard orientation)
+	const rotation = Math.PI / 2; // 90 degrees
+	const cosR = Math.cos(rotation);
+	const sinR = Math.sin(rotation);
+	let px = x * cosR - y * sinR;
+	let py = x * sinR + y * cosR;
+
+	// Calculate angle from positive y-axis (since vertex points up)
+	let angle = Math.atan2(px, py);
+	angle = Math.abs(angle);
+
+	// Pentagon has 5 sectors, each is 72 degrees (2π/5)
+	const sectorAngle = TAU / 5;
+	const halfSector = sectorAngle / 2;
+
+	// Reduce to first sector using symmetry
+	let sector = Math.floor(angle / sectorAngle);
+	angle = angle - sector * sectorAngle;
+	// Rotate to center of sector (symmetric around y-axis)
+	angle = angle - halfSector;
+
+	// Calculate signed distance to pentagon edge
+	// The edge line in the first sector makes an angle of halfSector with y-axis
+	let dist = L(px, py);
+	// Distance to edge: r * cos(halfSector) / cos(angle) gives the distance along the ray
+	let edgeDist = (r * Math.cos(halfSector)) / Math.cos(Math.abs(angle));
+
+	// Apply corner rounding if specified
+	if (cornerRadius > 0) {
+		// Calculate distance to the nearest corner (vertex)
+		// Corners are at the boundaries between sectors
+		let cornerAngle = Math.abs(angle);
+		// Distance from center to corner vertex
+		let cornerDist = r / Math.cos(halfSector);
+		// Distance from point to corner
+		let distToCorner = L(px - 0, py - cornerDist);
+		// Round the corner by subtracting the corner radius
+		let roundedCornerDist = distToCorner - cornerRadius;
+
+		// Blend between edge distance and rounded corner distance
+		// Use smoothstep to transition near corners
+		let cornerBlend = smoothstep(halfSector * 0.7, halfSector, cornerAngle);
+		edgeDist = mix(edgeDist, roundedCornerDist + r - cornerDist, cornerBlend);
+	}
+
+	// Signed distance: positive outside, negative inside
+	return dist - edgeDist;
 }
 
 function sdf_hexagon(p, c, r) {
