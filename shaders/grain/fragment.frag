@@ -6,6 +6,12 @@ uniform sampler2D uTexture;
 uniform float uTime;
 uniform float uSeed;
 uniform float uAmount; // grain intensity [0..1]
+// Spatial threshold (UV 0-1): grain visible only inside the rectangle
+uniform float uThresholdMinX; // left edge [0..1]
+uniform float uThresholdMaxX; // right edge [0..1]
+uniform float uThresholdMinY; // bottom edge [0..1]
+uniform float uThresholdMaxY; // top edge [0..1]
+uniform float uThresholdSmooth; // soft edge width in UV (0 = hard edge)
 
 float random(vec2 st, float seed) {
 	return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -16,6 +22,14 @@ void main() {
 	vec4 color = texture2D(uTexture, uv);
 
 	float amount = clamp(uAmount, 0.0, 1.0);
+
+	// Spatial threshold: grain visible only when uv is inside the x/y rectangle
+	float smoothWidth = max(0.001, uThresholdSmooth);
+	float inRangeX = smoothstep(uThresholdMinX, uThresholdMinX + smoothWidth, uv.x)
+		* (1.0 - smoothstep(uThresholdMaxX - smoothWidth, uThresholdMaxX, uv.x));
+	float inRangeY = smoothstep(uThresholdMinY, uThresholdMinY + smoothWidth, uv.y)
+		* (1.0 - smoothstep(uThresholdMaxY - smoothWidth, uThresholdMaxY, uv.y));
+	amount *= inRangeX * inRangeY;
 
 	vec2 noise_uv = uv * 128.0;
 	float angle = 0.25;
