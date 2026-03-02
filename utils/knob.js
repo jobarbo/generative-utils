@@ -36,7 +36,7 @@ if (navigator.requestMIDIAccess) {
 
 			if (currentPage === 0) {
 				if (controller === 32) {
-					const angle = map(value, 0, 127, 0, 1.14159 * 2, true);
+					const angle = map(value, 0, 127, 0, 3.14159 * 4, true);
 					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
 						shaderEffects.updateEffectParam("symmetry", "rotationStartingAngle", angle);
 					}

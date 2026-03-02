@@ -62,9 +62,17 @@ vec2 vectorField(vec2 pos, float time) {
 	vec2 toCenter = pos - center;
 	float dist = length(toCenter);
 
-	// Rotating vector field with noise perturbation
-	float angle = atan(toCenter.y, toCenter.x) + time * 0.5;
-	float radius = dist + noise(pos * 5.0 + time * 0.3) * 0.2;
+	// At center, atan(0,0) is undefined and dist=0 → use time-based direction for global translation
+	const float eps = 0.0001;
+	float angle;
+	float radius;
+	if (dist < eps) {
+		angle = time * 0.5;
+		radius = noise(pos * 5.0 + time * 0.3) * 0.2;
+	} else {
+		angle = atan(toCenter.y, toCenter.x) + time * 0.5;
+		radius = dist + noise(pos * 5.0 + time * 0.3) * 0.2;
+	}
 
 	vec2 direction = vec2(cos(angle + radius * 3.0), sin(angle + radius * 3.0));
 	float magnitude = (noise(pos * 3.0 + time * 0.5) * 0.5 + 0.5);
