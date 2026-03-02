@@ -80,6 +80,11 @@ vec2 vectorField(vec2 pos, float time) {
 	return direction * magnitude;
 }
 
+// Mirror repeat: map to [0,1] by flipping every other tile (normal | flipped | normal | ...), seamless on both axes
+vec2 mirrorRepeat(vec2 u) {
+	return 1.0 - abs(fract(u) * 2.0 - 1.0);
+}
+
 // Horizontal symmetry: mirror across horizontal center line (top half reflects to bottom)
 vec2 horizontalSymmetry(vec2 uv) {
 	vec2 center = vec2(0.5, 0.5);
@@ -306,11 +311,8 @@ void main() {
 	// Combine rotation with translation
 	vec2 transformedUV = rotatedUV + vec2(0.5) + offset;
 
-	// Use fract() to wrap around smoothly and ensure UVs stay within bounds
-	vec2 sourceUV = fract(transformedUV);
-
-	// Ensure sourceUV is clamped to valid texture coordinates
-	sourceUV = clamp(sourceUV, 0.0, 1.0);
+	// Mirror repeat: seamless looping (normal | flipped | normal | ...) on both axes, no seam
+	vec2 sourceUV = mirrorRepeat(transformedUV);
 
 	vec4 symmetricColor = texture2D(uTexture, sourceUV);
 
