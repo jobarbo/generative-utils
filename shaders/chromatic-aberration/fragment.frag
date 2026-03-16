@@ -42,7 +42,7 @@ void main() {
 
 	vec4 originalColor = texture2D(uTexture, uv);
 
-	float aberrationAmount = (uAmount > 0.0) ? uAmount : 0.003;
+	float aberrationAmount = (uAmount > 0.0) ? uAmount : 0.0;
 
 	float noiseScale = 6.0;
 	vec2 noiseCoord = uv * noiseScale + uTime * 0.2;

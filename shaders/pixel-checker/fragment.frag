@@ -53,10 +53,19 @@ void main() {
 	float subpixelIndex = floor(cellPos.x * 3.0); // 0, 1, or 2
 	
 	// Position within the subpixel (0.0 to 1.0)
-	vec2 subpixelPos = vec2(
-		fract(cellPos.x * 3.0),
-		cellPos.y
-	);
+	vec2 subpixelPos;
+	if (uCellSize > 1.5) {
+		subpixelPos = vec2(
+			fract(cellPos.x * 3.0),
+			cellPos.y
+		);
+	} else {
+		// Small-cell mode: base subpixel position on screen-space x to avoid aliasing
+		subpixelPos = vec2(
+			fract(cellPos.x * uCellSize),
+			cellPos.y
+		);
+	}
 	
 	// Create rounded phosphor dots with smooth falloff
 	// Center the dot at (0.5, 0.5) within each subpixel
