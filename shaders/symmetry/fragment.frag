@@ -4,6 +4,7 @@ varying vec2 vTexCoord;
 
 uniform sampler2D uTexture;
 uniform vec2 uResolution;
+uniform vec2 uCenter; // center of symmetry (normalized coords)
 uniform float uSeed;
 uniform float uSymmetryMode; // 0=horizontal, 1=vertical, 2=2-line, 3=4-line, 4=8-line, 5=16-line, 6=radial
 uniform float uAmount; // blend strength [0..1]
@@ -87,7 +88,7 @@ vec2 mirrorRepeat(vec2 u) {
 
 // Horizontal symmetry: mirror across horizontal center line (top half reflects to bottom)
 vec2 horizontalSymmetry(vec2 uv) {
-	vec2 center = vec2(0.5, 0.5);
+	vec2 center = uCenter;
 	vec2 offset = uv - center;
 	// Mirror the Y coordinate across the horizontal center
 	vec2 mirrored = vec2(offset.x, abs(offset.y));
@@ -96,7 +97,7 @@ vec2 horizontalSymmetry(vec2 uv) {
 
 // Vertical symmetry: mirror across vertical center line (left half reflects to right)
 vec2 verticalSymmetry(vec2 uv) {
-	vec2 center = vec2(0.5, 0.5);
+	vec2 center = uCenter;
 	vec2 offset = uv - center;
 	// Mirror the X coordinate across the vertical center
 	vec2 mirrored = vec2(abs(offset.x), offset.y);
@@ -105,7 +106,7 @@ vec2 verticalSymmetry(vec2 uv) {
 
 // 2-line symmetry: mirror across both horizontal and vertical center lines (one quadrant reflects to all four)
 vec2 twoLineSymmetry(vec2 uv) {
-	vec2 center = vec2(0.5, 0.5);
+	vec2 center = uCenter;
 	vec2 offset = uv - center;
 	// Mirror both X and Y coordinates
 	vec2 mirrored = vec2(abs(offset.x), abs(offset.y));
@@ -114,7 +115,7 @@ vec2 twoLineSymmetry(vec2 uv) {
 
 // 4-line symmetry: create 4 quadrants with symmetry
 vec2 fourLineSymmetry(vec2 uv) {
-	vec2 center = vec2(0.5, 0.5);
+	vec2 center = uCenter;
 	vec2 offset = uv - center;
 
 	// Determine which quadrant we're in
@@ -132,7 +133,7 @@ vec2 fourLineSymmetry(vec2 uv) {
 
 // 8-line symmetry: create 8 sections with symmetry
 vec2 eightLineSymmetry(vec2 uv) {
-	vec2 center = vec2(0.5, 0.5);
+	vec2 center = uCenter;
 	vec2 offset = uv - center;
 
 	// Take absolute values to fold into one quadrant
@@ -147,7 +148,7 @@ vec2 eightLineSymmetry(vec2 uv) {
 
 // 16-line symmetry: create 16 sections with smoother transitions
 vec2 sixteenLineSymmetry(vec2 uv) {
-	vec2 center = vec2(0.5, 0.5);
+	vec2 center = uCenter;
 	vec2 offset = uv - center;
 
 	// Take absolute values to fold into one quadrant (creates 4-fold)
@@ -176,7 +177,7 @@ vec2 sixteenLineSymmetry(vec2 uv) {
 
 // Radial symmetry: create radial pattern
 vec2 radialSymmetry(vec2 uv) {
-	vec2 center = vec2(0.5, 0.5);
+	vec2 center = uCenter;
 	vec2 offset = uv - center;
 
 	// Take absolute values to fold into one quadrant
@@ -302,14 +303,14 @@ void main() {
 	float sinAngle = sin(rotationAngle);
 
 	// Move to center, rotate, move back
-	vec2 centeredUV = symmetricUV - vec2(0.5);
+	vec2 centeredUV = symmetricUV - uCenter;
 	vec2 rotatedUV = vec2(
 		centeredUV.x * cosAngle - centeredUV.y * sinAngle,
 		centeredUV.x * sinAngle + centeredUV.y * cosAngle
 	);
 
 	// Combine rotation with translation
-	vec2 transformedUV = rotatedUV + vec2(0.5) + offset;
+	vec2 transformedUV = rotatedUV + uCenter + offset;
 
 	// Mirror repeat: seamless looping (normal | flipped | normal | ...) on both axes, no seam
 	vec2 sourceUV = mirrorRepeat(transformedUV);
@@ -325,7 +326,7 @@ void main() {
 		vec4 debugColor = finalColor;
 
 		// Draw center point
-		float distFromCenter = distance(uv, vec2(0.5));
+		float distFromCenter = distance(uv, uCenter);
 		if (distFromCenter < 0.005) {
 			debugColor = vec4(1.0, 0.0, 0.0, 1.0); // Red center point
 		}
@@ -335,27 +336,27 @@ void main() {
 
 		if (mode == 0) {
 			// Horizontal line
-			if (abs(uv.y - 0.5) < lineThickness) {
+			if (abs(uv.y - uCenter.y) < lineThickness) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 1) {
 			// Vertical line
-			if (abs(uv.x - 0.5) < lineThickness) {
+			if (abs(uv.x - uCenter.x) < lineThickness) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 2) {
 			// Both horizontal and vertical lines
-			if (abs(uv.y - 0.5) < lineThickness || abs(uv.x - 0.5) < lineThickness) {
+			if (abs(uv.y - uCenter.y) < lineThickness || abs(uv.x - uCenter.x) < lineThickness) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 3) {
 			// Both horizontal and vertical lines
-			if (abs(uv.y - 0.5) < lineThickness || abs(uv.x - 0.5) < lineThickness) {
+			if (abs(uv.y - uCenter.y) < lineThickness || abs(uv.x - uCenter.x) < lineThickness) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 4) {
 			// Horizontal, vertical, and two diagonal lines (8-fold)
-			if (abs(uv.y - 0.5) < lineThickness || abs(uv.x - 0.5) < lineThickness ||
+			if (abs(uv.y - uCenter.y) < lineThickness || abs(uv.x - uCenter.x) < lineThickness ||
 				abs(uv.x - uv.y) < lineThickness || abs(uv.x + uv.y - 1.0) < lineThickness) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
@@ -368,7 +369,7 @@ void main() {
 			float radius = length(offset);
 
 			// Center cross lines (horizontal and vertical)
-			bool centerCross = abs(uv.y - 0.5) < lineThickness || abs(uv.x - 0.5) < lineThickness;
+			bool centerCross = abs(uv.y - uCenter.y) < lineThickness || abs(uv.x - uCenter.x) < lineThickness;
 
 			// Diagonal lines at 45 degrees (from 8-fold)
 			bool diagonals = abs(uv.x - uv.y) < lineThickness || abs(uv.x + uv.y - 1.0) < lineThickness;
