@@ -461,7 +461,7 @@ function showLoadingBar(elapsedTime, maxFrames, renderStart, framesRendered) {
  * @returns {Generator} A generator function that handles the animation
  */
 function createAnimationGenerator(config) {
-	const {items, maxFrames, startTime, cycleLength, renderItem, moveItem, onComplete} = config;
+	const {items, maxFrames, startTime, cycleLength, renderItem, moveItem, onComplete, frameMode} = config;
 
 	let elapsedTime = 0;
 	let framesRendered = 0;
@@ -470,6 +470,30 @@ function createAnimationGenerator(config) {
 	let totalOperations = maxFrames ? items.length * maxFrames : Infinity;
 	let operationsCompleted = 0;
 	let currentFrame = 0;
+
+	// frameMode: yield once per complete pass — all items stay in sync (p5 draw-loop style)
+	if (frameMode) {
+		function* frameModeGenerator() {
+			while (drawing) {
+				for (let i = 0; i < items.length; i++) {
+					if (renderItem) renderItem(items[i], currentFrame);
+					if (moveItem) moveItem(items[i], currentFrame);
+				}
+				currentFrame++;
+				framesRendered++;
+				if (maxFrames) {
+					showLoadingBar(currentFrame, maxFrames, renderStart, framesRendered);
+					if (currentFrame >= maxFrames) {
+						drawing = false;
+						if (onComplete) onComplete();
+						return;
+					}
+				}
+				yield;
+			}
+		}
+		return frameModeGenerator();
+	}
 
 	function* animationGenerator() {
 		let count = 0;
