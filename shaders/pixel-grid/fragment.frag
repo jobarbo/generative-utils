@@ -41,17 +41,18 @@ void main() {
 			cellPos
 		);
 
-		// Sample the 4 surrounding cell centers
-		vec2 c00 = cellIndex / uGridSize + 0.5 / uGridSize;
-		vec2 c10 = (cellIndex + vec2(1.0, 0.0)) / uGridSize + 0.5 / uGridSize;
-		vec2 c01 = (cellIndex + vec2(0.0, 1.0)) / uGridSize + 0.5 / uGridSize;
-		vec2 c11 = (cellIndex + vec2(1.0, 1.0)) / uGridSize + 0.5 / uGridSize;
+		// Sample the 4 surrounding cell centers.
+		// Wrap neighbor cell indices with mod so out-of-bound edges sample
+		// from the opposite side of the grid (torus wrap).
+		vec2 idx00 = mod(cellIndex,                       uGridSize);
+		vec2 idx10 = mod(cellIndex + vec2(1.0, 0.0), uGridSize);
+		vec2 idx01 = mod(cellIndex + vec2(0.0, 1.0), uGridSize);
+		vec2 idx11 = mod(cellIndex + vec2(1.0, 1.0), uGridSize);
 
-		// Clamp to [0,1] to avoid edge artifacts
-		c00 = clamp(c00, 0.0, 1.0);
-		c10 = clamp(c10, 0.0, 1.0);
-		c01 = clamp(c01, 0.0, 1.0);
-		c11 = clamp(c11, 0.0, 1.0);
+		vec2 c00 = (idx00 + 0.5) / uGridSize;
+		vec2 c10 = (idx10 + 0.5) / uGridSize;
+		vec2 c01 = (idx01 + 0.5) / uGridSize;
+		vec2 c11 = (idx11 + 0.5) / uGridSize;
 
 		vec4 s00 = texture2D(uTexture, c00);
 		vec4 s10 = texture2D(uTexture, c10);
