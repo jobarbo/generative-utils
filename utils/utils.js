@@ -467,7 +467,7 @@ function createAnimationGenerator(config) {
 	let framesRendered = 0;
 	let renderStart = Date.now();
 	let drawing = true;
-	let totalOperations = items.length * maxFrames;
+	let totalOperations = maxFrames ? items.length * maxFrames : Infinity;
 	let operationsCompleted = 0;
 	let currentFrame = 0;
 
@@ -487,17 +487,20 @@ function createAnimationGenerator(config) {
 
 				if (count > cycleLength) {
 					count = 0;
-					// Calculate progress based on total operations instead of just frames
-					let progress = (operationsCompleted / totalOperations) * maxFrames;
-					showLoadingBar(progress, maxFrames, renderStart, framesRendered);
 
-					// Check if we've reached 100%
-					if (progress >= maxFrames) {
-						drawing = false;
-						if (onComplete) {
-							onComplete();
+					if (maxFrames) {
+						// Calculate progress based on total operations instead of just frames
+						let progress = (operationsCompleted / totalOperations) * maxFrames;
+						showLoadingBar(progress, maxFrames, renderStart, framesRendered);
+
+						// Check if we've reached 100%
+						if (progress >= maxFrames) {
+							drawing = false;
+							if (onComplete) {
+								onComplete();
+							}
+							return;
 						}
-						return;
 					}
 
 					yield;
