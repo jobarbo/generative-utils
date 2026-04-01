@@ -9,6 +9,10 @@ uniform float uBlurAmount;    // Blur radius/intensity in pixels
 uniform float uBlurQuality;   // Number of sampling rings/steps (1-8, higher = better quality)
 uniform float uBlurDirection; // Angle in radians for directional mode
 uniform vec2 uBlurCenter;     // Center point for radial mode (normalized 0-1)
+uniform float uBlurStart;     // Starting radius for radial blur (normalized 0-1, blur kicks in beyond this distance)
+uniform float uBlurCrt;       // 0.0 = circular radial, 1.0 = super-ellipse (CRT shape)
+uniform float uBlurCrtPower;  // Super-ellipse exponent (2.0 = ellipse, 4.0+ = more rectangular/CRT-like)
+uniform float uBlurMin;       // Minimum blur amount at blurStart (radial mode)
 
 const float PI = 3.14159265359;
 const float TAU = 6.28318530718;
@@ -44,6 +48,29 @@ vec4 radialBlur(vec2 uv) {
 	vec2 dir = uv - uBlurCenter;
 	float dist = length(dir);
 
+	// Compute distance from center using either circular or super-ellipse (CRT) shape
+	float normalizedDist;
+	if (uBlurCrt > 0.5) {
+		// Super-ellipse distance: |x|^n + |y|^n = 1
+		// Gives a rounded-rectangle shape like a CRT screen
+		vec2 centered = abs(dir / 0.5); // Normalize to 0-1 range from center to edge
+		float n = max(uBlurCrtPower, 2.0);
+		normalizedDist = pow(pow(centered.x, n) + pow(centered.y, n), 1.0 / n);
+	} else {
+		// Circular distance
+		float maxDist = 0.7071; // ~sqrt(0.5), max distance from center to corner
+		normalizedDist = dist / maxDist;
+	}
+
+	float blurFactor = smoothstep(uBlurStart, 1.0, normalizedDist);
+
+	float effectiveAmount = mix(uBlurMin, uBlurAmount, blurFactor);
+
+	// Early exit if this pixel gets no blur
+	if (effectiveAmount <= 0.001) {
+		return texture2D(uTexture, uv);
+	}
+
 	vec4 color = texture2D(uTexture, uv);
 	float totalWeight = 1.0;
 
@@ -52,7 +79,7 @@ vec4 radialBlur(vec2 uv) {
 	for (float i = 1.0; i <= 32.0; i++) {
 		if (i > steps) break;
 		float t = i / steps;
-		float strength = uBlurAmount * 0.01; // Scale down for usable range
+		float strength = effectiveAmount * 0.01;
 		vec2 sampleUV = uv - dir * strength * t;
 		float weight = 1.0 - t * 0.5;
 		color += texture2D(uTexture, sampleUV) * weight;
