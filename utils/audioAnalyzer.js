@@ -84,7 +84,7 @@ class AudioAnalyzer {
 				},
 				(err) => {
 					console.error("[AudioAnalyzer] getUserMedia failed:", err);
-				}
+				},
 			);
 		} else if (source === "chime") {
 			this.sourceType = "chime";

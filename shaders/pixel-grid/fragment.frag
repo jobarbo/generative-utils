@@ -31,23 +31,29 @@ void main() {
 		color = texture2D(uTexture, cellCenterUV);
 	} else {
 		// DIFFUSE MODE: smooth bilinear interpolation between surrounding cell centers
+		// Offset cellUV by -0.5 so cellPos=0 lands on the cell center, keeping
+		// the interpolation centered (no top-left shift vs pixel mode).
+		vec2 diffuseCellUV = uv * uGridSize - 0.5;
+		vec2 diffuseCellIndex = floor(diffuseCellUV);
+		vec2 diffuseCellPos = fract(diffuseCellUV);
+
 		// t controls the blending curve:
-		//   uDiffuse=0.0 → smoothstep(0.5,0.5,...) = step function = same as pixel mode
-		//   uDiffuse=1.0 → smoothstep(0.0,1.0,...) = linear blend between cells
+		//   uDiffuse=0.0 → step function = same as pixel mode
+		//   uDiffuse=1.0 → linear blend between cells
 		float halfRange = uDiffuse * 0.5;
 		vec2 t = smoothstep(
 			vec2(0.5 - halfRange),
 			vec2(0.5 + halfRange),
-			cellPos
+			diffuseCellPos
 		);
 
 		// Sample the 4 surrounding cell centers.
 		// Wrap neighbor cell indices with mod so out-of-bound edges sample
 		// from the opposite side of the grid (torus wrap).
-		vec2 idx00 = mod(cellIndex,                       uGridSize);
-		vec2 idx10 = mod(cellIndex + vec2(1.0, 0.0), uGridSize);
-		vec2 idx01 = mod(cellIndex + vec2(0.0, 1.0), uGridSize);
-		vec2 idx11 = mod(cellIndex + vec2(1.0, 1.0), uGridSize);
+		vec2 idx00 = mod(diffuseCellIndex,                           uGridSize);
+		vec2 idx10 = mod(diffuseCellIndex + vec2(1.0, 0.0),         uGridSize);
+		vec2 idx01 = mod(diffuseCellIndex + vec2(0.0, 1.0),         uGridSize);
+		vec2 idx11 = mod(diffuseCellIndex + vec2(1.0, 1.0),         uGridSize);
 
 		vec2 c00 = (idx00 + 0.5) / uGridSize;
 		vec2 c10 = (idx10 + 0.5) / uGridSize;

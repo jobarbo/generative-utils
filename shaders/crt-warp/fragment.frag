@@ -7,7 +7,7 @@ uniform vec2 uResolution;
 uniform float uWarpAmount;      // Barrel distortion strength (0.0 = flat, ~0.3-0.5 = subtle TV, ~1.0+ = heavy)
 uniform float uCornerRadius;    // Corner rounding/vignette darkness (0.0 = no darkening, 1.0 = full black corners)
 uniform float uCornerSmooth;    // Softness of corner fade (higher = softer edge)
-uniform float uBorderColor;     // 0.0 = black border outside screen, 1.0 = mirror/repeat
+uniform float uBorderColor;     // 0.0 = black border, 1.0 = clamp to edge, 2.0 = infinite mirror
 uniform float uVignette;        // Overall vignette intensity (0.0 = none, 1.0 = strong edge darkening)
 
 // Barrel distortion: bends UVs outward from center like a CRT tube
@@ -44,21 +44,23 @@ void main() {
 	// Apply barrel distortion
 	vec2 warpedUV = barrelDistortion(uv, uWarpAmount);
 
-	// Check if warped UVs are outside the texture
-	bool outsideBounds = warpedUV.x < 0.0 || warpedUV.x > 1.0 || warpedUV.y < 0.0 || warpedUV.y > 1.0;
-
 	vec4 color;
-	if (outsideBounds) {
-		if (uBorderColor > 0.5) {
-			// Mirror mode: clamp to edge
-			vec2 clampedUV = clamp(warpedUV, 0.0, 1.0);
-			color = texture2D(uTexture, clampedUV);
-		} else {
-			// Black border
-			color = vec4(0.0, 0.0, 0.0, 1.0);
-		}
+	if (uBorderColor > 1.5) {
+		// Infinite mirror: abs(mod(uv+1,2)-1) is identity inside [0,1], mirrors outside.
+		// No outsideBounds branch — avoids GPU warp divergence at the barrel boundary.
+		vec2 mirroredUV = abs(mod(warpedUV + 1.0, 2.0) - 1.0);
+		color = texture2D(uTexture, mirroredUV);
+	} else if (uBorderColor > 0.5) {
+		// Clamp to edge: clamp() is identity inside [0,1].
+		color = texture2D(uTexture, clamp(warpedUV, 0.0, 1.0));
 	} else {
-		color = texture2D(uTexture, warpedUV);
+		// Black border (needs explicit outside check)
+		bool outsideBounds = warpedUV.x < 0.0 || warpedUV.x > 1.0 || warpedUV.y < 0.0 || warpedUV.y > 1.0;
+		if (outsideBounds) {
+			color = vec4(0.0, 0.0, 0.0, 1.0);
+		} else {
+			color = texture2D(uTexture, warpedUV);
+		}
 	}
 
 	// Corner darkening (rounded rectangle mask)
