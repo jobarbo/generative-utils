@@ -68,68 +68,36 @@ class AudioAnalyzer {
 
 		if (source === "microphone") {
 			this.sourceType = "microphone";
-			console.log("🎤 [AudioAnalyzer] Creating p5.AudioIn...");
-			this.mic = new p5.AudioIn();
-			console.log("🎤 [AudioAnalyzer] Calling mic.start()... (ALLOW microphone permission in the browser popup!)");
-			this.mic.start();
+			this.mic = new p5.AudioIn((err) => {
+				console.error("[AudioAnalyzer] Microphone not supported:", err);
+			});
 
-			// mic.start() is async - check status after a delay
-			setTimeout(() => {
-				console.log("\n📋 [AudioAnalyzer] === MIC STATUS CHECK (1 second later) ===");
-
-				if (!this.mic) {
-					console.error("❌ Mic object is null!");
-					return;
-				}
-
-				console.log("Mic object:", this.mic);
-
-				// Check if mic has audio stream
-				if (this.mic.mediaStream) {
-					console.log(`✅ mediaStream exists`);
-					if (this.mic.mediaStream.active) {
-						console.log(`✅ mediaStream is ACTIVE!`);
-						const tracks = this.mic.mediaStream.getTracks();
-						console.log(`   Audio tracks: ${tracks.length}`);
-						tracks.forEach((track, i) => {
-							console.log(`   Track ${i}: kind=${track.kind}, enabled=${track.enabled}, readyState=${track.readyState}`);
-						});
-					} else {
-						console.warn(`⚠️ mediaStream exists but NOT active`);
+			// p5.AudioIn.start(success, error) runs after getUserMedia resolves — wire FFT then, not before.
+			// Browsers often start the AudioContext suspended until a gesture; resume after the mic is allowed.
+			this.mic.start(
+				() => {
+					const ac = typeof getAudioContext === "function" ? getAudioContext() : null;
+					if (ac && ac.state !== "running") {
+						ac.resume().catch(() => {});
 					}
-				} else {
-					console.error(`❌ NO mediaStream! Permission was likely DENIED.`);
-					console.error(`   Go to browser settings → Privacy → Microphone → Allow localhost:3301`);
+					this.fft.setInput(this.mic);
+				},
+				(err) => {
+					console.error("[AudioAnalyzer] getUserMedia failed:", err);
 				}
-
-				// Also check currentSource
-				if (this.mic.currentSource) {
-					console.log(`✅ currentSource is connected:`, this.mic.currentSource);
-				} else {
-					console.warn(`⚠️ currentSource is null (still initializing?)`);
-				}
-
-				console.log("=== END MIC STATUS ===\n");
-			}, 1000);
-
-			console.log("🎤 [AudioAnalyzer] Setting FFT input to microphone");
-			this.fft.setInput(this.mic);
-			console.log("✅ [AudioAnalyzer] Microphone initialization requested (check status in 1 second)");
+			);
 		} else if (source === "chime") {
 			this.sourceType = "chime";
 			// The FFT will analyze all p5.sound output by default
 			// No need to set input - it listens to master output
-			console.log("Audio Analyzer: MIDI Chime mode (listening to all audio output)");
 		} else if (source instanceof p5.SoundFile) {
 			this.sourceType = "file";
 			this.soundFile = source;
 			this.fft.setInput(source);
-			console.log("Audio Analyzer: Sound file initialized");
 		} else if (source && source.connect) {
 			// Custom audio source (p5.Oscillator, p5.PolySynth, etc.)
 			this.sourceType = "custom";
 			this.fft.setInput(source);
-			console.log("Audio Analyzer: Custom source initialized");
 		}
 
 		this.isInitialized = true;
@@ -141,29 +109,14 @@ class AudioAnalyzer {
 	 */
 	update() {
 		if (!this.isInitialized) {
-			console.warn("AudioAnalyzer not initialized");
 			return this;
 		}
 
 		// Get frequency spectrum
-		const spectrum = this.fft.analyze();
+		this.fft.analyze();
 
 		// Get overall volume (0-255, normalized to 0-1)
 		let currentVolume = this.fft.getEnergy("bass", "treble") / 255;
-
-		// Debug: Log mic level every 60 frames
-		if (typeof frameCount !== "undefined" && frameCount % 60 === 0) {
-			if (this.mic) {
-				const micLevel = this.mic.getLevel();
-				const indicator = micLevel > 0.01 ? "🎤 AUDIO DETECTED!" : "🔇 (silence)";
-				console.log(`[AudioAnalyzer] Mic level: ${micLevel.toFixed(3)} ${indicator}`);
-			}
-
-			// Only log FFT details if there's actual signal
-			if (currentVolume > 0.01) {
-				console.log(`[AudioAnalyzer] Raw FFT energy: bass=${this.fft.getEnergy("bass")} mid=${this.fft.getEnergy("mid")} treble=${this.fft.getEnergy("treble")}`);
-			}
-		}
 
 		// Smooth volume
 		this.volume = this.smooth(this.volume, currentVolume, this.smoothing);

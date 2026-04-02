@@ -16,7 +16,6 @@
  */
 class AudioKnob {
 	constructor() {
-		console.log("AudioKnob: initialized");
 		this.mappings = [];
 		this.enabled = true;
 		this.initialized = false;
@@ -35,22 +34,17 @@ class AudioKnob {
 	 * @returns {AudioKnob} this (for chaining)
 	 */
 	setSource(source = "microphone", options = {}) {
-		console.log(`[AudioKnob] setSource() called with source: '${source}'`);
-
 		if (typeof audioAnalyzer === "undefined") {
-			console.error("❌ [AudioKnob] audioAnalyzer not found. Make sure audioAnalyzer.js is loaded.");
+			console.error("[AudioKnob] audioAnalyzer not found. Make sure audioAnalyzer.js is loaded.");
 			return this;
 		}
 
 		try {
-			console.log(`[AudioKnob] Initializing audioAnalyzer...`);
 			audioAnalyzer.init(source, options);
 			this.sourceType = source;
 			this.initialized = true;
-			console.log(`✅ [AudioKnob] Successfully initialized with source '${source}'`);
-			console.log(`[AudioKnob] Ready to map audio features to shader uniforms`);
 		} catch (e) {
-			console.error("❌ [AudioKnob] setSource() error:", e);
+			console.error("[AudioKnob] setSource() error:", e);
 		}
 
 		return this;
@@ -73,7 +67,6 @@ class AudioKnob {
 			outMin,
 			outMax,
 		});
-		console.log(`[AudioKnob] Mapping added: ${audioFeature} → ${effectName}.${paramName} (${outMin} to ${outMax})`);
 		return this;
 	}
 
@@ -92,8 +85,6 @@ class AudioKnob {
 	 */
 	toggle() {
 		this.enabled = !this.enabled;
-		const status = this.enabled ? "✅ ENABLED" : "❌ DISABLED";
-		console.log(`[AudioKnob] ${status}`);
 		return this;
 	}
 
@@ -105,9 +96,7 @@ class AudioKnob {
 		if (!this.initialized || !this.enabled) return;
 		if (typeof audioAnalyzer === "undefined") return;
 
-		// Guard: only update if shaderEffects is available
 		if (typeof shaderEffects === "undefined" || typeof shaderEffects.updateEffectParam !== "function") {
-			console.warn("[AudioKnob] shaderEffects not available yet");
 			return;
 		}
 
@@ -117,27 +106,14 @@ class AudioKnob {
 		// Handle beat pulse (smooth decay for frame-based animation)
 		if (audioAnalyzer.isBeat) {
 			this.beatPulse = 1.0;
-			console.log("[AudioKnob] BEAT DETECTED! Pulse: 1.0");
 		} else {
 			this.beatPulse *= this.beatPulseDecay;
-		}
-
-		// Apply each mapping
-		const shouldLog = audioAnalyzer.energy > 0.01 && frameCount % 30 === 0;
-
-		if (shouldLog) {
-			console.log(`[AudioKnob] Audio: bass=${audioAnalyzer.bass.toFixed(3)} mid=${audioAnalyzer.mid.toFixed(3)} treble=${audioAnalyzer.treble.toFixed(3)} energy=${audioAnalyzer.energy.toFixed(3)} volume=${audioAnalyzer.volume.toFixed(3)}`);
 		}
 
 		for (const m of this.mappings) {
 			const audioValue = this._getAudioValue(m.audioFeature);
 			const mapped = map(audioValue, 0, 1, m.outMin, m.outMax, true);
 			shaderEffects.updateEffectParam(m.effectName, m.paramName, mapped);
-
-			// Log only if there's actual signal
-			if (shouldLog) {
-				console.log(`  [AudioKnob] ${m.audioFeature}=${audioValue.toFixed(3)} → ${m.effectName}.${m.paramName}=${mapped.toFixed(3)}`);
-			}
 		}
 	}
 
@@ -169,7 +145,6 @@ class AudioKnob {
 			case "beat":
 				return this.beatPulse; // smooth beat pulse instead of raw boolean
 			default:
-				console.warn(`AudioKnob: unknown audio feature '${feature}'`);
 				return 0;
 		}
 	}
@@ -180,10 +155,8 @@ class AudioKnob {
 	 * @returns {AudioKnob} this (for chaining)
 	 */
 	switchSource(source) {
-		console.log(`[AudioKnob] Switching source to '${source}'...`);
-
 		if (typeof audioAnalyzer === "undefined") {
-			console.error("❌ [AudioKnob] audioAnalyzer not found");
+			console.error("[AudioKnob] audioAnalyzer not found");
 			return this;
 		}
 
@@ -192,9 +165,8 @@ class AudioKnob {
 			audioAnalyzer.init(source);
 			this.sourceType = source;
 			this.beatPulse = 0; // reset beat pulse on source switch
-			console.log(`✅ [AudioKnob] Successfully switched to source '${source}'`);
 		} catch (e) {
-			console.error("❌ [AudioKnob] switchSource() error:", e);
+			console.error("[AudioKnob] switchSource() error:", e);
 		}
 
 		return this;
