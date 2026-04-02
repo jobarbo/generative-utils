@@ -1,5 +1,24 @@
 let knob = Array(19).fill(0);
 
+// Smooth interpolation for knob-driven shader params
+// Each entry: { current, target, speed, effect, param }
+const knobSmoothing = {};
+
+function addKnobSmooth(controller, effect, param, initial = 0, speed = 0.08) {
+	knobSmoothing[controller] = { current: initial, target: initial, speed, effect, param };
+}
+
+function updateKnobSmoothing() {
+	for (const ctrl in knobSmoothing) {
+		const s = knobSmoothing[ctrl];
+		if (Math.abs(s.target - s.current) < 0.0001) continue;
+		s.current += (s.target - s.current) * s.speed;
+		if (typeof shaderEffects !== "undefined") {
+			shaderEffects.updateEffectParam(s.effect, s.param, s.current);
+		}
+	}
+}
+
 let kval = "";
 let kname = "";
 
@@ -37,8 +56,8 @@ if (navigator.requestMIDIAccess) {
 			if (currentPage === 0) {
 				if (controller === 32) {
 					const angle = map(value, 0, 127, 0, 3.14159 * 4, true);
-					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-						shaderEffects.updateEffectParam("symmetry", "rotationStartingAngle", angle);
+					if (knobSmoothing[32]) {
+						knobSmoothing[32].target = angle;
 					}
 				}
 
