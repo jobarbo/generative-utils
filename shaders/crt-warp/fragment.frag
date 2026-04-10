@@ -11,6 +11,7 @@ uniform float uBorderColor;     // 0.0 = black border, 1.0 = clamp to edge, 2.0 
 uniform float uVignette;        // Overall vignette intensity (0.0 = none, 1.0 = strong edge darkening)
 
 // Barrel distortion: bends UVs outward from center like a CRT tube
+// Corners are pinned to canvas boundaries — only the interior perspective warps
 vec2 barrelDistortion(vec2 uv, float amount) {
 	vec2 centered = uv - 0.5;
 
@@ -20,7 +21,9 @@ vec2 barrelDistortion(vec2 uv, float amount) {
 	// Barrel distortion formula
 	float distortion = 1.0 + r2 * amount;
 
-	vec2 distorted = centered * distortion;
+	// Normalize so corners (r2 = 0.5) stay exactly at [0,1] boundaries
+	float cornerDistortion = 1.0 + 0.5 * amount;
+	vec2 distorted = centered * (distortion / cornerDistortion);
 
 	return distorted + 0.5;
 }

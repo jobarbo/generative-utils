@@ -5,7 +5,7 @@ let knob = Array(19).fill(0);
 const knobSmoothing = {};
 
 function addKnobSmooth(controller, effect, param, initial = 0, speed = 0.08) {
-	knobSmoothing[controller] = { current: initial, target: initial, speed, effect, param };
+	knobSmoothing[controller] = {current: initial, target: initial, speed, effect, param};
 }
 
 function updateKnobSmoothing() {
@@ -55,7 +55,7 @@ if (navigator.requestMIDIAccess) {
 
 			if (currentPage === 0) {
 				if (controller === 32) {
-					const angle = map(value, 0, 127, 0, 3.14159 * 4, true);
+					const angle = map(value, 0, 127, 0, (PI / 2) * 1, true);
 					if (knobSmoothing[32]) {
 						knobSmoothing[32].target = angle;
 					}
