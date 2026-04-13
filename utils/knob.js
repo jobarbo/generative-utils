@@ -55,7 +55,7 @@ if (navigator.requestMIDIAccess) {
 
 			if (currentPage === 0) {
 				if (controller === 32) {
-					const angle = map(value, 0, 127, 0, (PI / 2) * 1, true);
+					const angle = map(value, 0, 127, 0, PI * 1, true);
 					if (knobSmoothing[32]) {
 						knobSmoothing[32].target = angle;
 					}
