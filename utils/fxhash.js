@@ -6,13 +6,12 @@
 (function () {
 	"use strict";
 
-	var BASE58 =
-		"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+	var BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 	function randomDefaultHash() {
 		return (
 			"oo" +
-			Array.from({ length: 49 }, function () {
+			Array.from({length: 49}, function () {
 				return BASE58[(Math.random() * BASE58.length) | 0];
 			}).join("")
 		);
@@ -21,7 +20,7 @@
 	function randomTezosAddress() {
 		return (
 			"tz1" +
-			Array.from({ length: 33 }, function () {
+			Array.from({length: 33}, function () {
 				return BASE58[(Math.random() * BASE58.length) | 0];
 			}).join("")
 		);
@@ -82,12 +81,12 @@
 			b |= 0;
 			c |= 0;
 			d |= 0;
-			var t = (a + b | 0) + d | 0;
+			var t = (((a + b) | 0) + d) | 0;
 			d = (d + 1) | 0;
 			a = b ^ (b >>> 9);
-			b = c + (c << 3) | 0;
+			b = (c + (c << 3)) | 0;
 			c = (c << 21) | (c >>> 11);
-			c = c + t | 0;
+			c = (c + t) | 0;
 			return (t >>> 0) / 4294967296;
 		};
 	}
@@ -124,16 +123,13 @@
 		params: function (definitions) {
 			var self = this;
 			this._params = definitions.map(function (d) {
-				return Object.assign({}, d, { version: self._version });
+				return Object.assign({}, d, {version: self._version});
 			});
 			this._rawValues = {};
 			for (var i = 0; i < this._params.length; i++) {
 				var param = this._params[i];
 				if (param.type === "select") {
-					var opts =
-						param.options && param.options.options
-							? param.options.options
-							: [];
+					var opts = param.options && param.options.options ? param.options.options : [];
 					var val;
 					if (typeof param.default !== "undefined") {
 						val = param.default;
@@ -186,9 +182,6 @@
 
 	makeRand(hash, function (fn) {
 		$fx.rand = fn;
-	});
-	makeRand(minter, function (fn) {
-		$fx.randminter = fn;
 	});
 
 	window.$fx = $fx;
