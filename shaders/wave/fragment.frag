@@ -13,9 +13,9 @@ void main() {
     // Center UV coordinates without distorting aspect ratio
     vec2 centered_uv = uv * 2.0 - 1.0;  // Convert from [0,1] to [-1,1] range
 
-    // Calculate distance from center (0,0) and create center-weighted multiplier
-    float dist = sin(length(centered_uv.x)) + sin(length(centered_uv.y));
-    float centerWeight = 1.0 - smoothstep(1.0, 0.01, dist);  // More effect in center
+    // Radial distance from center — smoothstep edges must be increasing (edge0 < edge1) or GLSL gives undefined / NaN → black frame.
+    float dist = length(centered_uv);
+    float centerWeight = 1.0 - smoothstep(0.0, 1.414, dist); // stronger toward center
 
     // Create pulsing effect
     float pulse = sin(uTime * 1.7) * 0.000015 + 0.015;
@@ -37,7 +37,7 @@ void main() {
     centered_uv += waveOffset + spiralOffset;
 
     // Convert back to texture space
-    uv = (centered_uv + 1.0) * 0.5;  // Convert back to [0,1] range for texture sampling
+    uv = clamp((centered_uv + 1.0) * 0.5, 0.0, 1.0);
 
     // Sample the original image at the center position
     vec4 originalColor = texture2D(uTexture, uv);
@@ -47,9 +47,9 @@ void main() {
     float spiralFactor = spiral * 2.0; // Amplify the spiral effect for aberration
 
     // Use the angle and spiral calculations to create offset vectors that follow the spiral pattern
-    vec2 redOffset = uv + aberrationAmount * vec2(cos(angle + spiralFactor), sin(angle + spiralFactor));
-    vec2 blueOffset = uv + aberrationAmount * vec2(cos(angle - spiralFactor), sin(angle - spiralFactor));
-    vec2 greenOffset = uv + aberrationAmount * vec2(cos(angle + spiralFactor * 0.5), sin(angle - spiralFactor * 0.5));
+    vec2 redOffset = clamp(uv + aberrationAmount * vec2(cos(angle + spiralFactor), sin(angle + spiralFactor)), vec2(0.0), vec2(1.0));
+    vec2 blueOffset = clamp(uv + aberrationAmount * vec2(cos(angle - spiralFactor), sin(angle - spiralFactor)), vec2(0.0), vec2(1.0));
+    vec2 greenOffset = clamp(uv + aberrationAmount * vec2(cos(angle + spiralFactor * 0.5), sin(angle - spiralFactor * 0.5)), vec2(0.0), vec2(1.0));
 
     // Sample colors with offsets
     vec4 redChannel = texture2D(uTexture, redOffset);
