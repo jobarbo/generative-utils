@@ -39,30 +39,6 @@ void main() {
     // Convert back to texture space
     uv = clamp((centered_uv + 1.0) * 0.5, 0.0, 1.0);
 
-    // Sample the original image at the center position
     vec4 originalColor = texture2D(uTexture, uv);
-
-    // Enhanced chromatic aberration that follows the spiral pattern
-    float aberrationAmount = 0.0005 * (1.5  * dist * 5.0);
-    float spiralFactor = spiral * 2.0; // Amplify the spiral effect for aberration
-
-    // Use the angle and spiral calculations to create offset vectors that follow the spiral pattern
-    vec2 redOffset = clamp(uv + aberrationAmount * vec2(cos(angle + spiralFactor), sin(angle + spiralFactor)), vec2(0.0), vec2(1.0));
-    vec2 blueOffset = clamp(uv + aberrationAmount * vec2(cos(angle - spiralFactor), sin(angle - spiralFactor)), vec2(0.0), vec2(1.0));
-    vec2 greenOffset = clamp(uv + aberrationAmount * vec2(cos(angle + spiralFactor * 0.5), sin(angle - spiralFactor * 0.5)), vec2(0.0), vec2(1.0));
-
-    // Sample colors with offsets
-    vec4 redChannel = texture2D(uTexture, redOffset);
-    vec4 greenChannel = texture2D(uTexture, greenOffset);
-    vec4 blueChannel = texture2D(uTexture, blueOffset);
-
-    // Create psychedelic color mixing
-    vec4 color = vec4(
-        redChannel.r,
-        greenChannel.g,
-        blueChannel.b,
-        1.0
-    );
-
-    gl_FragColor = color;
+    gl_FragColor = originalColor;
 }
