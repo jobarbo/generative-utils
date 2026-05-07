@@ -10,6 +10,7 @@
  *       .map('bass',   'symmetry', 'rotationSpeed', 0.5, 20)
  *       .map('energy', 'chromatic', 'amount',       0,   0.8)
  *       .map('beat',   'zoom',     'zoomAmount',    1.0, 1.2);
+ *       .map('bass',   'zoom',     'zoomOutAmount', 1.2, 12, 0, 1, 1, 0.5); // ramp only after 50% “bass”
  *
  *   In draw loop (via customDraw in sketch.js):
  *     audioKnob.update();
@@ -55,17 +56,25 @@ class AudioKnob {
 	 * @param {string} audioFeature - audio feature name ('bass', 'mid', 'treble', 'energy', 'volume', 'beat', 'subBass', 'lowMid', 'highMid', 'presence')
 	 * @param {string} effectName - shader effect name (e.g., 'symmetry', 'chromatic', 'pixelSort', 'zoom', 'grain')
 	 * @param {string} paramName - parameter name (e.g., 'rotationSpeed', 'amount', 'threshold')
-	 * @param {number} outMin - minimum output value (mapped from audio range 0-1)
-	 * @param {number} outMax - maximum output value (mapped from audio range 0-1)
+	 * @param {number} outMin - minimum output value
+	 * @param {number} outMax - maximum output value
+	 * @param {number} [inMin=0] - lower bound of the **input** feature (0–1). Raise this if the effect stays pegged at outMax: bass often sits in e.g. 0.4–0.95, not 0–1.
+	 * @param {number} [inMax=1] - upper bound of the input feature. Lower this if quiet passages still hit the max.
+	 * @param {number} [exponent=1] - applied to normalized input before mapping: use 1.5–3 to soften peaks (less time stuck at max), or 0.5–0.8 to make hits punch harder.
+	 * @param {number} [stepFrom] - if set (0–1), output stays at outMin until normalized input reaches this fraction, then ramps to outMax over the remainder. Example: 0.5 = no increase until halfway through the input range.
 	 * @returns {AudioKnob} this (for chaining)
 	 */
-	map(audioFeature, effectName, paramName, outMin, outMax) {
+	map(audioFeature, effectName, paramName, outMin, outMax, inMin = 0, inMax = 1, exponent = 1, stepFrom = undefined) {
 		this.mappings.push({
 			audioFeature,
 			effectName,
 			paramName,
 			outMin,
 			outMax,
+			inMin,
+			inMax,
+			exponent,
+			stepFrom,
 		});
 		return this;
 	}
@@ -111,8 +120,28 @@ class AudioKnob {
 		}
 
 		for (const m of this.mappings) {
-			const audioValue = this._getAudioValue(m.audioFeature);
-			const mapped = map(audioValue, 0, 1, m.outMin, m.outMax, true);
+			let audioValue = this._getAudioValue(m.audioFeature);
+			const inLo = m.inMin ?? 0;
+			const inHi = m.inMax ?? 1;
+			audioValue = constrain(audioValue, inLo, inHi);
+			const span = inHi - inLo;
+			let t = span > 0 ? (audioValue - inLo) / span : 0;
+			const step = m.stepFrom;
+			if (step !== undefined && step !== null && !Number.isNaN(step)) {
+				const s = constrain(step, 0, 1);
+				if (s >= 1) {
+					t = t >= 1 ? 1 : 0;
+				} else if (t <= s) {
+					t = 0;
+				} else {
+					t = (t - s) / (1 - s);
+				}
+			}
+			const exp = m.exponent ?? 1;
+			if (exp !== 1 && t > 0) {
+				t = Math.pow(t, exp);
+			}
+			const mapped = map(t, 0, 1, m.outMin, m.outMax, true);
 			shaderEffects.updateEffectParam(m.effectName, m.paramName, mapped);
 		}
 	}
