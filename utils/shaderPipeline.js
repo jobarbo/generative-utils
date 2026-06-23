@@ -12,11 +12,21 @@ class ShaderPipeline {
 		this.initialized = false;
 		this.width = 0;
 		this.height = 0;
+		this.pixelDensity = 1;
 	}
 
-	init(width, height, enabledEffects = []) {
+	init(width, height, enabledEffects = [], pixelDensity = 1) {
+		for (const buf of this.buffers) {
+			try {
+				buf?.remove?.();
+			} catch {
+				// ignore
+			}
+		}
+
 		this.width = width;
 		this.height = height;
+		this.pixelDensity = pixelDensity;
 
 		// Only create buffers if we have multiple effects that need ping-pong
 		if (enabledEffects.length <= 1) {
@@ -25,15 +35,14 @@ class ShaderPipeline {
 			// Only create 2 buffers when we actually need ping-pong (2+ effects)
 			// Safari mobile fallback - divide by 2 for better performance
 			const bufferDivisor = isSafariMobile() ? 1 : 1;
-			this.buffers = [this.shaderManager.createBuffer(width / bufferDivisor, height / bufferDivisor), this.shaderManager.createBuffer(width / bufferDivisor, height / bufferDivisor)];
+			const bufferW = width / bufferDivisor;
+			const bufferH = height / bufferDivisor;
+			this.buffers = [
+				this.shaderManager.createBuffer(bufferW, bufferH, pixelDensity),
+				this.shaderManager.createBuffer(bufferW, bufferH, pixelDensity),
+			];
 		}
 
-		// Initialize buffers
-		for (const buf of this.buffers) {
-			if (buf) {
-				buf.noStroke();
-			}
-		}
 		this.initialized = true;
 		return this;
 	}
@@ -58,21 +67,30 @@ class ShaderPipeline {
 			console.error("ShaderPipeline not initialized. Call init(width, height).");
 			return;
 		}
+
+		const resolveTexture = (texture) => this.shaderManager.resolveTexture(texture);
+		const renderPass = (passName, uniformsProvider, readTex, writeTarget) => {
+			const uniforms = Object.assign({}, uniformsProvider(), {uTexture: resolveTexture(readTex)});
+			const ctx = writeTarget || this.p5;
+			this.shaderManager.apply(passName, uniforms, ctx).drawFullscreenQuad(ctx);
+		};
+
 		if (this.passes.length === 0) {
 			// just blit input to screen
-			this.shaderManager.apply("copy", {uTexture: inputTexture}, outputTarget).drawFullscreenQuad(outputTarget);
+			this.shaderManager
+				.apply("copy", {uTexture: resolveTexture(inputTexture)}, outputTarget)
+				.drawFullscreenQuad(outputTarget);
 			return;
 		}
 
 		// Special case: if only one effect, render directly to output
 		if (this.passes.length === 1) {
 			const {name, uniformsProvider} = this.passes[0];
-			const uniforms = Object.assign({}, uniformsProvider(), {uTexture: inputTexture});
-			this.shaderManager.apply(name, uniforms, outputTarget).drawFullscreenQuad(outputTarget);
+			renderPass(name, uniformsProvider, inputTexture, outputTarget);
 			return;
 		}
 
-		// For multiple effects, use ping-pong between 2 buffers
+		// For multiple effects, use ping-pong between 2 framebuffers (same WEBGL context)
 		let readTex = inputTexture;
 		let ping = 0;
 
@@ -80,20 +98,15 @@ class ShaderPipeline {
 			const {name, uniformsProvider} = this.passes[i];
 
 			if (i === this.passes.length - 1) {
-				// Last effect renders directly to output
-				const uniforms = Object.assign({}, uniformsProvider(), {uTexture: readTex});
-				this.shaderManager.apply(name, uniforms, outputTarget).drawFullscreenQuad(outputTarget);
+				renderPass(name, uniformsProvider, readTex, outputTarget);
 			} else {
-				// Intermediate effects use ping-pong buffers
 				const writeBuf = this.buffers[ping];
-				writeBuf.clear();
-
-				const uniforms = Object.assign({}, uniformsProvider(), {uTexture: readTex});
-				this.shaderManager.apply(name, uniforms, writeBuf).drawFullscreenQuad(writeBuf);
-
-				// Next effect reads from what we just wrote
+				writeBuf.begin();
+				this.p5.clear();
+				renderPass(name, uniformsProvider, readTex, this.p5);
+				writeBuf.end();
 				readTex = writeBuf;
-				ping = 1 - ping; // Switch between buffers
+				ping = 1 - ping;
 			}
 		}
 	}

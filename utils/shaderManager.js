@@ -97,17 +97,37 @@ class ShaderManager {
 	}
 
 	/**
-	 * Create an offscreen WEBGL buffer for shader passes
-	 * @param {number} width
-	 * @param {number} height
-	 * @returns {p5.Graphics}
+	 * Create an offscreen framebuffer for shader ping-pong passes.
+	 * Uses the main WEBGL context (unlike createGraphics WEBGL buffers).
+	 * @param {number} width - Logical width
+	 * @param {number} height - Logical height
+	 * @param {number} pixelDensity - Physical pixel density multiplier
+	 * @returns {p5.Framebuffer}
 	 */
-	createBuffer(width, height) {
+	createBuffer(width, height, pixelDensity = 1) {
 		if (!this.p5Instance) {
 			console.error("ShaderManager not initialized");
 			return null;
 		}
-		return this.p5Instance.createGraphics(width, height, this.p5Instance.WEBGL);
+		return this.p5Instance.createFramebuffer({
+			width,
+			height,
+			density: pixelDensity,
+			textureFiltering: "NEAREST",
+		});
+	}
+
+	/**
+	 * Normalize a pipeline input (Graphics, Framebuffer, Image) for sampler2D uniforms.
+	 * Only p5.Framebuffer objects expose a .color texture; p5.Graphics also has a .color() method.
+	 * @param {*} texture
+	 * @returns {*}
+	 */
+	resolveTexture(texture) {
+		if (texture && typeof texture.begin === "function" && typeof texture.end === "function") {
+			return texture.color;
+		}
+		return texture;
 	}
 }
 
