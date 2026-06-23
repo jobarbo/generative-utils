@@ -113,7 +113,6 @@ class ShaderManager {
 			width,
 			height,
 			density: pixelDensity,
-			textureFiltering: "NEAREST",
 		});
 	}
 
