@@ -69,24 +69,24 @@ class ShaderPipeline {
 		}
 
 		const resolveTexture = (texture) => this.shaderManager.resolveTexture(texture);
-		const renderPass = (passName, uniformsProvider, readTex, writeTarget) => {
+		const renderPass = (passName, uniformsProvider, readTex, writeTarget, useRenderRatio = false) => {
 			const uniforms = Object.assign({}, uniformsProvider(), {uTexture: resolveTexture(readTex)});
 			const ctx = writeTarget || this.p5;
-			this.shaderManager.apply(passName, uniforms, ctx).drawFullscreenQuad(ctx);
+			this.shaderManager.apply(passName, uniforms, ctx).drawFullscreenQuad(ctx, useRenderRatio);
 		};
 
 		if (this.passes.length === 0) {
 			// just blit input to screen
 			this.shaderManager
 				.apply("copy", {uTexture: resolveTexture(inputTexture)}, outputTarget)
-				.drawFullscreenQuad(outputTarget);
+				.drawFullscreenQuad(outputTarget, true);
 			return;
 		}
 
 		// Special case: if only one effect, render directly to output
 		if (this.passes.length === 1) {
 			const {name, uniformsProvider} = this.passes[0];
-			renderPass(name, uniformsProvider, inputTexture, outputTarget);
+			renderPass(name, uniformsProvider, inputTexture, outputTarget, true);
 			return;
 		}
 
@@ -98,12 +98,12 @@ class ShaderPipeline {
 			const {name, uniformsProvider} = this.passes[i];
 
 			if (i === this.passes.length - 1) {
-				renderPass(name, uniformsProvider, readTex, outputTarget);
+				renderPass(name, uniformsProvider, readTex, outputTarget, true);
 			} else {
 				const writeBuf = this.buffers[ping];
 				writeBuf.begin();
 				this.p5.clear();
-				renderPass(name, uniformsProvider, readTex, this.p5);
+				renderPass(name, uniformsProvider, readTex, this.p5, false);
 				writeBuf.end();
 				readTex = writeBuf;
 				ping = 1 - ping;
