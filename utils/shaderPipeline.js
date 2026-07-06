@@ -37,10 +37,7 @@ class ShaderPipeline {
 			const bufferDivisor = isSafariMobile() ? 1 : 1;
 			const bufferW = width / bufferDivisor;
 			const bufferH = height / bufferDivisor;
-			this.buffers = [
-				this.shaderManager.createBuffer(bufferW, bufferH, pixelDensity),
-				this.shaderManager.createBuffer(bufferW, bufferH, pixelDensity),
-			];
+			this.buffers = [this.shaderManager.createBuffer(bufferW, bufferH, pixelDensity), this.shaderManager.createBuffer(bufferW, bufferH, pixelDensity)];
 		}
 
 		this.initialized = true;
@@ -77,9 +74,7 @@ class ShaderPipeline {
 
 		if (this.passes.length === 0) {
 			// just blit input to screen
-			this.shaderManager
-				.apply("copy", {uTexture: resolveTexture(inputTexture)}, outputTarget)
-				.drawFullscreenQuad(outputTarget, true);
+			this.shaderManager.apply("copy", {uTexture: resolveTexture(inputTexture)}, outputTarget).drawFullscreenQuad(outputTarget, true);
 			return;
 		}
 
