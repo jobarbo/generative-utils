@@ -5,13 +5,14 @@ varying vec2 vTexCoord;
 uniform sampler2D uTexture;
 uniform float uTime;
 uniform vec2 uResolution;
+uniform vec2 uCenter;
 
 void main() {
     // Flip the y coordinate to match p5js coordinate system
     vec2 uv = vec2(vTexCoord.x, 1.0 - vTexCoord.y);
 
-    // Center UV coordinates without distorting aspect ratio
-    vec2 centered_uv = uv * 2.0 - 1.0;  // Convert from [0,1] to [-1,1] range
+    // Offset from configurable center (default 0.5, 0.5 = canvas center)
+    vec2 centered_uv = (uv - uCenter) * 2.0;
 
     // Radial distance from center — smoothstep edges must be increasing (edge0 < edge1) or GLSL gives undefined / NaN → black frame.
     float dist = length(centered_uv);
