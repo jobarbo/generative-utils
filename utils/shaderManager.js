@@ -12,7 +12,7 @@ class ShaderManager {
 		this.basePath = "";
 		this.renderRatio = {
 			fitCanvas: false,
-			width: 3,
+			width: 1,
 			height: 1,
 		};
 	}
