@@ -45,7 +45,7 @@ class AudioAnalyzer {
 		this.beatHistory = [];
 
 		// Smoothing
-		this.smoothing = 0.8; // 0 = no smoothing, 1 = maximum smoothing
+		this.smoothing = 0.65; // 0 = no smoothing, 1 = maximum smoothing
 
 		// Configuration
 		this.fftBands = 1024; // power of 2: 16–1024 in p5.sound 0.3
@@ -54,6 +54,23 @@ class AudioAnalyzer {
 		// Source type
 		this.sourceType = null; // 'microphone', 'file', 'chime', 'custom'
 		this.isInitialized = false;
+
+		// Source perception (updated each frame / on mic open)
+		this.sourceError = null;
+		this.micOpened = false;
+		this.isReceiving = false; // true when measurable signal present this frame
+		this._receiveFloor = 0.0004; // peak of lower FFT bins
+		this._receiveHoldMs = 350;
+		this._lastReceiveTime = 0;
+		this._unlockBound = false;
+
+		// Tone.js FFT returns tiny linear gains for mics (~0.001–0.05).
+		// Map them up to usable 0–1 levels for UI + shader mappings.
+		this.sensitivity = 1; // extra multiply after AGC (1 = AGC only)
+		this.levelCurve = 0.55; // <1 expands quiet sounds
+		this._agcPeak = 0.008; // rolling max of raw band energy
+		this._agcDecay = 0.997; // slow fall so quiet pauses don't blow up noise
+		this._agcFloor = 0.002; // ignore noise floor when adapting
 
 		// Classic p5.sound band ranges (Hz)
 		this.bandRanges = {
@@ -81,7 +98,30 @@ class AudioAnalyzer {
 	}
 
 	/**
-	 * Average spectrum energy between two frequencies (0–1).
+	 * Read a bin amplitude normalized toward 0–1 linear gain.
+	 */
+	_binValue(v) {
+		if (v == null) return 0;
+		return v > 1 ? v / 255 : v;
+	}
+
+	/**
+	 * Map tiny Tone.js FFT gains → usable 0–1 levels (AGC + curve).
+	 * AGC peak is updated once per frame in update(), not here.
+	 */
+	_normalizeLevel(raw) {
+		const r = Math.max(0, raw || 0);
+		const denom = Math.max(this._agcPeak * 0.85, this._agcFloor);
+		let t = Math.min(1, (r / denom) * this.sensitivity);
+		if (this.levelCurve !== 1 && t > 0) {
+			t = Math.pow(t, this.levelCurve);
+		}
+		return Math.min(1, Math.max(0, t));
+	}
+
+	/**
+	 * Average spectrum energy between two frequencies (0–1 after normalization).
+	 * Uses RMS of bins (more responsive than a flat mean on sparse spectra).
 	 * Replaces the removed p5.FFT.getEnergy() from p5.sound 1.x.
 	 */
 	getEnergy(lowOrName, highFreq) {
@@ -112,13 +152,21 @@ class AudioAnalyzer {
 			highIndex = tmp;
 		}
 
-		let sum = 0;
+		let sumSq = 0;
+		let peak = 0;
 		let count = 0;
 		for (let i = lowIndex; i <= highIndex; i++) {
-			sum += spectrum[i] || 0;
+			const v = this._binValue(spectrum[i]);
+			sumSq += v * v;
+			if (v > peak) peak = v;
 			count++;
 		}
-		return count > 0 ? sum / count : 0;
+		if (!count) return 0;
+
+		// Blend RMS + peak so narrow loud bands still register
+		const rms = Math.sqrt(sumSq / count);
+		const raw = rms * 0.65 + peak * 0.35;
+		return this._normalizeLevel(raw);
 	}
 
 	/**
@@ -136,6 +184,8 @@ class AudioAnalyzer {
 		if (options.fftSmoothing !== undefined) this.fftSmoothing = options.fftSmoothing;
 		if (options.smoothing !== undefined) this.smoothing = options.smoothing;
 		if (options.beatThreshold !== undefined) this.beatThreshold = options.beatThreshold;
+		if (options.sensitivity !== undefined) this.sensitivity = options.sensitivity;
+		if (options.levelCurve !== undefined) this.levelCurve = options.levelCurve;
 
 		const fftSize = this._normalizeFftSize(this.fftBands);
 		this.fftBands = fftSize;
@@ -145,46 +195,164 @@ class AudioAnalyzer {
 
 		if (source === "microphone") {
 			this.sourceType = "microphone";
+			this.micOpened = false;
+			this.sourceError = null;
 			this.mic = new p5.AudioIn();
 
-			// Keep mic out of speakers (feedback); analyze only
-			try {
-				this.mic.disconnect();
-			} catch (_) {
-				/* ignore */
-			}
-
-			this.fft.setInput(this.mic);
-
-			// p5.sound 0.3 start() has no callbacks — open mic and resume AudioContext after gesture/permission
-			try {
-				this.mic.start();
-			} catch (err) {
-				console.error("[AudioAnalyzer] Microphone start failed:", err);
-			}
-
-			const ac = typeof getAudioContext === "function" ? getAudioContext() : null;
-			if (ac && ac.state !== "running") {
-				ac.resume().catch(() => {});
-			}
+			// Don't route through setInput until the mic stream is actually open.
+			// Browsers require a user gesture for getUserMedia — retry on first click/key.
+			this._enableMicUnlock();
+			this._startMicrophone();
 		} else if (source === "chime") {
 			this.sourceType = "chime";
+			this.micOpened = true; // master output always "available"
 			// FFT listens to master output by default when no setInput is used
 		} else if (typeof p5.SoundFile === "function" && source instanceof p5.SoundFile) {
 			this.sourceType = "file";
 			this.soundFile = source;
+			this.micOpened = true;
 			this.fft.setInput(source);
 		} else if (source && (source.connect || source.getNode)) {
 			// Custom audio source (p5.Oscillator, p5.PolySynth, etc.)
 			this.sourceType = "custom";
+			this.micOpened = true;
 			this.fft.setInput(source);
 		} else {
 			console.warn("[AudioAnalyzer] Unknown source, defaulting to master output:", source);
 			this.sourceType = "chime";
+			this.micOpened = true;
 		}
 
 		this.isInitialized = true;
 		return this;
+	}
+
+	/**
+	 * Wire mic → FFT without speakers (avoids feedback).
+	 */
+	_wireMicToFft() {
+		if (!this.mic || !this.fft) return;
+		try {
+			this.mic.disconnect();
+		} catch (_) {
+			/* ignore */
+		}
+		try {
+			this.fft.setInput(this.mic);
+		} catch (err) {
+			console.warn("[AudioAnalyzer] setInput failed:", err);
+		}
+	}
+
+	/**
+	 * Attempt to open the microphone (may no-op until a user gesture).
+	 */
+	_startMicrophone() {
+		if (!this.mic) return;
+
+		const ac = typeof getAudioContext === "function" ? getAudioContext() : null;
+		if (ac && ac.state !== "running") {
+			ac.resume().catch(() => {});
+		}
+		if (typeof userStartAudio === "function") {
+			try {
+				userStartAudio();
+			} catch (_) {
+				/* ignore */
+			}
+		}
+
+		try {
+			this.mic.start();
+		} catch (err) {
+			this.sourceError = err?.message || String(err);
+			console.error("[AudioAnalyzer] Microphone start failed:", err);
+			return;
+		}
+
+		this._watchMicOpen();
+	}
+
+	/**
+	 * Resume AudioContext + retry mic.open on the first user gesture (required by browsers).
+	 */
+	_enableMicUnlock() {
+		if (this._unlockBound) return;
+		this._unlockBound = true;
+
+		const unlock = () => {
+			this.sourceError = null;
+			this._startMicrophone();
+		};
+
+		["pointerdown", "keydown", "touchstart"].forEach((ev) => {
+			document.addEventListener(ev, unlock, {passive: true});
+		});
+	}
+
+	/**
+	 * Poll Tone UserMedia until the mic stream is open, then route into FFT.
+	 */
+	_watchMicOpen() {
+		const tryAttach = () => {
+			const um = this.mic?.node;
+			if (um?.state === "started") {
+				if (!this.micOpened) {
+					this.micOpened = true;
+					this.sourceError = null;
+					this._wireMicToFft();
+					console.log("[AudioAnalyzer] Microphone open — routed to FFT");
+				}
+				return true;
+			}
+			return false;
+		};
+
+		if (tryAttach()) return;
+
+		let tries = 0;
+		const timer = setInterval(() => {
+			tries++;
+			if (tryAttach() || tries > 100) clearInterval(timer);
+		}, 100);
+	}
+
+	/**
+	 * Human-readable source perception status for debug UI.
+	 * @returns {{ code: string, label: string, ok: boolean, receiving: boolean }}
+	 */
+	getSourceStatus() {
+		if (!this.isInitialized) {
+			return {code: "not-init", label: "not init", ok: false, receiving: false};
+		}
+
+		const ac = typeof getAudioContext === "function" ? getAudioContext() : null;
+		if (ac && ac.state === "suspended") {
+			return {code: "suspended", label: "click page to unlock", ok: false, receiving: false};
+		}
+
+		if (this.sourceError) {
+			return {code: "denied", label: "source denied", ok: false, receiving: false};
+		}
+
+		if (this.sourceType === "microphone") {
+			const umState = this.mic?.node?.state;
+			if (umState === "started") {
+				if (!this.micOpened) {
+					this.micOpened = true;
+					this._wireMicToFft();
+				}
+			}
+			if (!this.micOpened) {
+				return {code: "waiting", label: "click page to enable mic", ok: false, receiving: false};
+			}
+		}
+
+		if (this.isReceiving) {
+			return {code: "live", label: "receiving", ok: true, receiving: true};
+		}
+
+		return {code: "silent", label: "no signal", ok: false, receiving: false};
 	}
 
 	/**
@@ -195,14 +363,42 @@ class AudioAnalyzer {
 			return this;
 		}
 
-		// Spectrum is already 0–1 in p5.sound 0.2+
+		// Keep trying to attach mic if permission landed mid-session
+		if (this.sourceType === "microphone" && this.mic?.node?.state === "started") {
+			if (!this.micOpened) {
+				this.micOpened = true;
+				this._wireMicToFft();
+			}
+		}
+
+		// Spectrum is tiny linear gains in p5.sound 0.2+ (Tone normalRange)
 		this.spectrum = this.fft.analyze() || [];
+
+		// Peak of lower bins for presence detection
+		let peak = 0;
+		const lowBins = Math.min(this.spectrum.length, 256);
+		for (let i = 0; i < lowBins; i++) {
+			const v = this._binValue(this.spectrum[i]);
+			if (v > peak) peak = v;
+		}
+		const now = typeof millis === "function" ? millis() : performance.now();
+		if (peak > this._receiveFloor) {
+			this._lastReceiveTime = now;
+		}
+		this.isReceiving = now - this._lastReceiveTime < this._receiveHoldMs;
+
+		// Seed / decay AGC once per frame from overall peak across the band we care about
+		if (peak > this._agcFloor) {
+			this._agcPeak = Math.max(this._agcPeak * this._agcDecay, peak);
+		} else {
+			this._agcPeak = Math.max(this._agcFloor, this._agcPeak * this._agcDecay);
+		}
 
 		const currentVolume = this.getEnergy("bass", "treble");
 		this.volume = this.smooth(this.volume, currentVolume, this.smoothing);
-		this.energy = Math.pow(this.volume, 2);
+		this.energy = Math.pow(this.volume, 1.4);
 
-		this.bass = this.smooth(this.bass, this.getEnergy("bass") , this.smoothing);
+		this.bass = this.smooth(this.bass, this.getEnergy("bass"), this.smoothing);
 		this.mid = this.smooth(this.mid, this.getEnergy("mid"), this.smoothing);
 		this.treble = this.smooth(this.treble, this.getEnergy("treble"), this.smoothing);
 

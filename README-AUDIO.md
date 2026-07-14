@@ -15,6 +15,29 @@ Add these to `index.html` (before `sketch.js`):
 <script src="./library/utils/audioDebugDisplay.js"></script>
 ```
 
+## Unified debug panel
+
+`audioDebugDisplay.js` exports **`debugPanel`** (alias: `audioDebugDisplay`) — one DOM overlay for:
+
+- **Perf** — FPS + loop countdown (from `shaderEffects`)
+- **Audio** — source, Bass/Mid/Treble/Volume/Energy, beat + BPM
+- **Spectrum** — live FFT (0–1 scale for p5.sound 0.2+)
+
+Separate from `#controls` / paramsPanel. Default hidden.
+
+```javascript
+debugPanel.init({
+	audio: audioAnalyzer,
+	shaders: shaderEffects,
+});
+
+// in draw():
+debugPanel.update();
+
+// key D (in keyPressed):
+debugPanel.toggle();
+```
+
 ## Quick Start with MIDI Chime
 
 ```javascript
@@ -32,7 +55,7 @@ function setup() {
 	});
 
 	enableMidiKeyboard();
-	audioDebugDisplay.init(audioAnalyzer); // press V to toggle
+	debugPanel.init({ audio: audioAnalyzer, shaders: shaderEffects }); // press D to toggle
 }
 ```
 
@@ -42,7 +65,7 @@ function setup() {
 - `A–K` — notes (C major scale)
 - `1–5` — chords
 - `Z`, `X`, `C` — kick, snare, hi-hat
-- `V` — toggle audio debug display
+- `D` — toggle unified debug panel (FPS / loop / audio / spectrum)
 
 ### Test patterns
 

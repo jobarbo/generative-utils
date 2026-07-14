@@ -1,271 +1,335 @@
 /**
- * Audio Debug Display
+ * Unified Debug Panel
  *
- * Simple on-screen display for debugging audio values
- * Shows real-time frequency bands, volume, beats, etc.
+ * DOM overlay for perf (FPS / loop) + audio monitoring (bands, beat, spectrum).
+ * Separate from #controls / paramsPanel. Toggle with D.
  *
  * Usage:
- * 1. In setup(): audioDebugDisplay.init(audioAnalyzer)
- * 2. In draw(): audioDebugDisplay.draw()
- * 3. Toggle with: audioDebugDisplay.toggle()
+ *   debugPanel.init({ audio: audioAnalyzer, shaders: shaderEffects });
+ *   // in draw():
+ *   debugPanel.update();
+ *   // key D → debugPanel.toggle()
+ *
+ * Backward-compat alias: audioDebugDisplay === debugPanel
  */
-class AudioDebugDisplay {
+class DebugPanel {
 	constructor() {
 		this.audioAnalyzer = null;
+		this.shaderEffects = null;
 		this.visible = false;
-		this.position = "top-right"; // 'top-right', 'top-left', 'bottom-right', 'bottom-left'
-		this.width = 200;
-		this.height = 250;
-		this.padding = 10;
-		this.barHeight = 15;
-		this.fontSize = 11;
+		this.el = null;
+		this.spectrumCanvas = null;
+		this.spectrumCtx = null;
+		this.refs = {};
+		this._boundKeyHandler = null;
+		this.spectrumWidth = 220;
+		this.spectrumHeight = 56;
 	}
 
 	/**
-	 * Initialize the debug display
-	 * @param {AudioAnalyzer} audioAnalyzer - The audio analyzer instance
+	 * @param {object} options
+	 * @param {object} [options.audio] - audioAnalyzer instance
+	 * @param {object} [options.shaders] - shaderEffects instance
 	 */
-	init(audioAnalyzer) {
-		this.audioAnalyzer = audioAnalyzer;
+	init(options = {}) {
+		// Support legacy init(audioAnalyzer)
+		if (options && typeof options.isInitialized !== "undefined" && !options.audio) {
+			this.audioAnalyzer = options;
+		} else {
+			this.audioAnalyzer = options.audio || (typeof audioAnalyzer !== "undefined" ? audioAnalyzer : null);
+			this.shaderEffects = options.shaders || (typeof shaderEffects !== "undefined" ? shaderEffects : null);
+		}
 
-		// Add keyboard shortcut to toggle display
-		document.addEventListener("keydown", (e) => {
-			if (e.key === "v" || e.key === "V") {
-				this.toggle();
-			}
+		this._ensureDom();
+		this._hideStandaloneOverlays();
+
+		// Keyboard toggle is handled by the sketch (key D) to avoid double-firing.
+		this._applyVisibility();
+		console.log("[debugPanel] ready — press D to toggle");
+		return this;
+	}
+
+	_ensureDom() {
+		if (this.el) return;
+
+		const panel = document.createElement("div");
+		panel.id = "debug-panel";
+		panel.className = "debug-panel is-hidden";
+		panel.setAttribute("aria-hidden", "true");
+
+		panel.innerHTML = `
+			<div class="debug-panel__header">
+				<span class="debug-panel__title">Debug</span>
+				<span class="debug-panel__hint">D</span>
+			</div>
+			<section class="debug-panel__section" data-section="perf">
+				<div class="debug-panel__row">
+					<span class="debug-panel__label">FPS</span>
+					<span class="debug-panel__value" data-ref="fps">—</span>
+				</div>
+				<div class="debug-panel__row">
+					<span class="debug-panel__label">Loop</span>
+					<span class="debug-panel__value" data-ref="loop">—</span>
+				</div>
+			</section>
+			<section class="debug-panel__section" data-section="audio">
+				<div class="debug-panel__row">
+					<span class="debug-panel__label">Source</span>
+					<span class="debug-panel__value" data-ref="source">—</span>
+				</div>
+				<div class="debug-panel__row">
+					<span class="debug-panel__label">Signal</span>
+					<span class="debug-panel__signal" data-ref="signal-dot"></span>
+					<span class="debug-panel__value" data-ref="signal">—</span>
+				</div>
+				<div class="debug-panel__bars">
+					${this._barHtml("bass", "Bass")}
+					${this._barHtml("mid", "Mid")}
+					${this._barHtml("treble", "Treble")}
+					${this._barHtml("volume", "Volume")}
+					${this._barHtml("energy", "Energy")}
+				</div>
+				<div class="debug-panel__row debug-panel__row--beat">
+					<span class="debug-panel__label">Beat</span>
+					<span class="debug-panel__beat" data-ref="beat"></span>
+					<span class="debug-panel__value" data-ref="bpm">BPM —</span>
+				</div>
+			</section>
+			<section class="debug-panel__section" data-section="spectrum">
+				<div class="debug-panel__row">
+					<span class="debug-panel__label">Spectrum</span>
+				</div>
+				<canvas class="debug-panel__spectrum" width="${this.spectrumWidth}" height="${this.spectrumHeight}" data-ref="spectrum"></canvas>
+			</section>
+		`;
+
+		document.body.appendChild(panel);
+		this.el = panel;
+
+		panel.querySelectorAll("[data-ref]").forEach((node) => {
+			this.refs[node.getAttribute("data-ref")] = node;
 		});
 
-		console.log("Audio debug display initialized - press V to toggle");
-		return this;
+		this.spectrumCanvas = this.refs.spectrum;
+		this.spectrumCtx = this.spectrumCanvas ? this.spectrumCanvas.getContext("2d") : null;
 	}
 
-	/**
-	 * Toggle visibility
-	 */
+	_barHtml(id, label) {
+		return `
+			<div class="debug-panel__bar" data-bar="${id}">
+				<div class="debug-panel__bar-meta">
+					<span>${label}</span>
+					<span data-ref="${id}-pct">0%</span>
+				</div>
+				<div class="debug-panel__bar-track">
+					<div class="debug-panel__bar-fill" data-ref="${id}-fill"></div>
+				</div>
+			</div>
+		`;
+	}
+
+	_hideStandaloneOverlays() {
+		["shader-fps-overlay", "shader-loop-overlay"].forEach((id) => {
+			const el = document.getElementById(id);
+			if (el) {
+				el.classList.add("is-hidden");
+				el.style.display = "none";
+			}
+		});
+	}
+
 	toggle() {
 		this.visible = !this.visible;
-		console.log(`Audio debug display: ${this.visible ? "ON" : "OFF"}`);
+		this._applyVisibility();
+		console.log(`[debugPanel] ${this.visible ? "ON" : "OFF"}`);
 		return this;
 	}
 
-	/**
-	 * Show the display
-	 */
 	show() {
 		this.visible = true;
+		this._applyVisibility();
 		return this;
 	}
 
-	/**
-	 * Hide the display
-	 */
 	hide() {
 		this.visible = false;
+		this._applyVisibility();
 		return this;
 	}
 
-	/**
-	 * Set position
-	 * @param {string} position - 'top-right', 'top-left', 'bottom-right', 'bottom-left'
-	 */
-	setPosition(position) {
-		this.position = position;
-		return this;
+	_applyVisibility() {
+		if (!this.el) return;
+		this.el.classList.toggle("is-hidden", !this.visible);
+		this.el.setAttribute("aria-hidden", this.visible ? "false" : "true");
 	}
 
 	/**
-	 * Get position coordinates
+	 * Call once per frame from draw()
 	 */
-	getPosition() {
-		const margin = 15;
+	update() {
+		if (!this.visible || !this.el) return;
 
-		switch (this.position) {
-			case "top-left":
-				return {x: margin, y: margin};
-			case "top-right":
-				return {x: width - this.width - margin, y: margin};
-			case "bottom-left":
-				return {x: margin, y: height - this.height - margin};
-			case "bottom-right":
-				return {x: width - this.width - margin, y: height - this.height - margin};
-			default:
-				return {x: width - this.width - margin, y: margin};
+		this._updatePerf();
+		this._updateAudio();
+		this._drawSpectrum();
+	}
+
+	_updatePerf() {
+		const shaders = this.shaderEffects;
+		if (this.refs.fps) {
+			const fps = shaders && typeof shaders.currentFPS === "number" ? shaders.currentFPS : null;
+			this.refs.fps.textContent = fps != null && fps > 0 ? `${fps} fps` : "—";
+		}
+
+		if (this.refs.loop) {
+			if (!shaders || !shaders.loopConfig?.enabled) {
+				this.refs.loop.textContent = "off";
+				this.refs.loop.classList.remove("is-warning");
+				return;
+			}
+
+			const countdown = typeof shaders.getLoopCountdown === "function" ? shaders.getLoopCountdown() : null;
+			if (!countdown) {
+				this.refs.loop.textContent = "—";
+				this.refs.loop.classList.remove("is-warning");
+				return;
+			}
+
+			const seconds = countdown.remaining.toFixed(1);
+			this.refs.loop.textContent = countdown.paused ? `pause ${seconds}s` : `${seconds}s`;
+			const warn = !countdown.paused && countdown.remaining <= (shaders.loopConfig.warnAtSeconds ?? 0);
+			this.refs.loop.classList.toggle("is-warning", warn);
 		}
 	}
 
-	/**
-	 * Draw the debug display
-	 */
+	_updateAudio() {
+		const audio = this.audioAnalyzer;
+		const ready = audio && audio.isInitialized;
+		const status = ready && typeof audio.getSourceStatus === "function" ? audio.getSourceStatus() : null;
+
+		if (this.refs.source) {
+			this.refs.source.textContent = ready ? audio.sourceType || "—" : "not init";
+		}
+
+		if (this.refs.signal) {
+			this.refs.signal.textContent = status ? status.label : "—";
+			this.refs.signal.classList.remove("is-ok", "is-warn", "is-error");
+			if (status) {
+				if (status.code === "live") this.refs.signal.classList.add("is-ok");
+				else if (status.code === "silent" || status.code === "waiting" || status.code === "suspended") {
+					this.refs.signal.classList.add("is-warn");
+				} else if (status.code === "denied" || status.code === "not-init") {
+					this.refs.signal.classList.add("is-error");
+				}
+			}
+		}
+
+		if (this.refs["signal-dot"]) {
+			this.refs["signal-dot"].classList.remove("is-ok", "is-warn", "is-error");
+			if (status?.code === "live") this.refs["signal-dot"].classList.add("is-ok");
+			else if (status?.code === "silent" || status?.code === "waiting" || status?.code === "suspended") {
+				this.refs["signal-dot"].classList.add("is-warn");
+			} else if (status) {
+				this.refs["signal-dot"].classList.add("is-error");
+			}
+		}
+
+		const bands = [
+			["bass", ready ? audio.bass : 0],
+			["mid", ready ? audio.mid : 0],
+			["treble", ready ? audio.treble : 0],
+			["volume", ready ? audio.volume : 0],
+			["energy", ready ? audio.energy : 0],
+		];
+
+		for (const [id, value] of bands) {
+			const pct = Math.round(Math.min(Math.max(value, 0), 1) * 100);
+			const fill = this.refs[`${id}-fill`];
+			const pctEl = this.refs[`${id}-pct`];
+			if (fill) fill.style.width = `${pct}%`;
+			if (pctEl) pctEl.textContent = `${pct}%`;
+		}
+
+		if (this.refs.beat) {
+			this.refs.beat.classList.toggle("is-active", !!(ready && audio.isBeat));
+		}
+		if (this.refs.bpm) {
+			this.refs.bpm.textContent = ready && audio.bpm ? `BPM ${audio.bpm}` : "BPM —";
+		}
+	}
+
+	_drawSpectrum() {
+		const ctx = this.spectrumCtx;
+		const canvas = this.spectrumCanvas;
+		if (!ctx || !canvas) return;
+
+		const w = canvas.width;
+		const h = canvas.height;
+		ctx.clearRect(0, 0, w, h);
+		ctx.fillStyle = "rgba(255,255,255,0.06)";
+		ctx.fillRect(0, 0, w, h);
+
+		const audio = this.audioAnalyzer;
+		if (!audio || !audio.isInitialized) return;
+
+		const spectrum = audio.getSpectrum() || [];
+		if (!spectrum.length) return;
+
+		const n = spectrum.length;
+		const barW = Math.max(w / n, 1);
+		const agc = Math.max(audio._agcPeak || 0.01, 0.002);
+		const sr = typeof sampleRate === "function" ? sampleRate() : 44100;
+		const nyquist = sr / 2;
+
+		// Band colors — same as debug bars (bass / mid / treble)
+		const bassColor = [255, 90, 90];
+		const midColor = [93, 255, 122];
+		const trebleColor = [90, 150, 255];
+
+		const lerpColor = (a, b, t) => [
+			Math.round(a[0] + (b[0] - a[0]) * t),
+			Math.round(a[1] + (b[1] - a[1]) * t),
+			Math.round(a[2] + (b[2] - a[2]) * t),
+		];
+
+		const colorForFreq = (hz) => {
+			if (hz <= 140) return bassColor;
+			if (hz <= 400) {
+				return lerpColor(bassColor, midColor, (hz - 140) / (400 - 140));
+			}
+			if (hz <= 2600) return midColor;
+			if (hz <= 5200) {
+				return lerpColor(midColor, trebleColor, (hz - 2600) / (5200 - 2600));
+			}
+			return trebleColor;
+		};
+
+		for (let i = 0; i < n; i++) {
+			let amp = spectrum[i] || 0;
+			if (amp > 1) amp = amp / 255;
+			// Match analyzer normalization so the spectrogram is readable with mic levels
+			amp = Math.min(1, amp / (agc * 0.85));
+			amp = Math.pow(amp, 0.55);
+			const barH = amp * h;
+			const hz = (i / n) * nyquist;
+			const [r, g, b] = colorForFreq(hz);
+			const alpha = 0.55 + amp * 0.45;
+			ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+			ctx.fillRect(i * barW, h - barH, Math.ceil(barW), barH);
+		}
+	}
+
+	// ---- Legacy p5-canvas API (no-ops / thin wrappers for old call sites) ----
+
 	draw() {
-		if (!this.visible || !this.audioAnalyzer || !this.audioAnalyzer.isInitialized) {
-			return;
-		}
-
-		push();
-
-		const pos = this.getPosition();
-		const x = pos.x;
-		const y = pos.y;
-		const w = this.width;
-		const p = this.padding;
-
-		// Background
-		fill(0, 0, 0, 80);
-		noStroke();
-		rect(x, y, w, this.height, 5);
-
-		// Title
-		fill(255, 255, 255);
-		textSize(12);
-		textAlign(LEFT, TOP);
-		text("Audio Debug (V)", x + p, y + p);
-
-		let currentY = y + p + 20;
-
-		// Main frequency bands
-		this.drawBar(x + p, currentY, w - 2 * p, "Bass", this.audioAnalyzer.bass, color(255, 50, 50));
-		currentY += this.barHeight + 3;
-
-		this.drawBar(x + p, currentY, w - 2 * p, "Mid", this.audioAnalyzer.mid, color(50, 255, 50));
-		currentY += this.barHeight + 3;
-
-		this.drawBar(x + p, currentY, w - 2 * p, "Treble", this.audioAnalyzer.treble, color(50, 150, 255));
-		currentY += this.barHeight + 3;
-
-		// Volume & Energy
-		currentY += 5;
-		this.drawBar(x + p, currentY, w - 2 * p, "Volume", this.audioAnalyzer.volume, color(200, 200, 200));
-		currentY += this.barHeight + 3;
-
-		this.drawBar(x + p, currentY, w - 2 * p, "Energy", this.audioAnalyzer.energy, color(255, 200, 50));
-		currentY += this.barHeight + 3;
-
-		// Beat indicator
-		currentY += 5;
-		fill(255);
-		textSize(this.fontSize);
-		text("Beat:", x + p, currentY);
-
-		if (this.audioAnalyzer.isBeat) {
-			fill(255, 100, 100);
-			ellipse(x + p + 40, currentY + 6, 12, 12);
-		} else {
-			noFill();
-			stroke(100);
-			strokeWeight(1);
-			ellipse(x + p + 40, currentY + 6, 12, 12);
-		}
-
-		// BPM
-		noStroke();
-		fill(255);
-		text(`BPM: ${this.audioAnalyzer.bpm || "---"}`, x + p + 60, currentY);
-		currentY += 20;
-
-		// Source info
-		fill(150);
-		textSize(10);
-		text(`Source: ${this.audioAnalyzer.sourceType}`, x + p, currentY);
-
-		pop();
+		this.update();
 	}
 
-	/**
-	 * Draw a level bar
-	 */
-	drawBar(x, y, maxWidth, label, value, barColor) {
-		push();
-
-		// Label
-		fill(200);
-		textSize(this.fontSize);
-		textAlign(LEFT, TOP);
-		text(label, x, y);
-
-		// Value
-		const valueText = (value * 100).toFixed(0) + "%";
-		textAlign(RIGHT, TOP);
-		text(valueText, x + maxWidth, y);
-
-		// Bar background
-		const barY = y + 13;
-		const barMaxWidth = maxWidth - 10;
-		fill(40);
-		noStroke();
-		rect(x, barY, barMaxWidth, 5, 2);
-
-		// Bar foreground
-		const barWidth = barMaxWidth * Math.min(value, 1.0);
-		fill(barColor);
-		rect(x, barY, barWidth, 5, 2);
-
-		pop();
-	}
-
-	/**
-	 * Draw spectrum visualizer (advanced)
-	 * @param {number} x - X position
-	 * @param {number} y - Y position
-	 * @param {number} w - Width
-	 * @param {number} h - Height
-	 */
-	drawSpectrum(x, y, w, h) {
-		if (!this.audioAnalyzer || !this.audioAnalyzer.isInitialized) return;
-
-		const spectrum = this.audioAnalyzer.getSpectrum();
-		const sliceWidth = w / spectrum.length;
-
-		push();
-		noFill();
-		stroke(100, 200, 255);
-		strokeWeight(2);
-
-		beginShape();
-		for (let i = 0; i < spectrum.length; i++) {
-			const amplitude = spectrum[i] / 255.0;
-			const barHeight = amplitude * h;
-			const xPos = x + i * sliceWidth;
-			const yPos = y + h - barHeight;
-
-			vertex(xPos, yPos);
-		}
-		endShape();
-
-		pop();
-	}
-
-	/**
-	 * Draw waveform (advanced)
-	 * @param {number} x - X position
-	 * @param {number} y - Y position
-	 * @param {number} w - Width
-	 * @param {number} h - Height
-	 */
-	drawWaveform(x, y, w, h) {
-		if (!this.audioAnalyzer || !this.audioAnalyzer.isInitialized) return;
-
-		const waveform = this.audioAnalyzer.getWaveform();
-		const sliceWidth = w / waveform.length;
-
-		push();
-		noFill();
-		stroke(255, 100, 100);
-		strokeWeight(2);
-
-		beginShape();
-		for (let i = 0; i < waveform.length; i++) {
-			const amplitude = waveform[i];
-			const xPos = x + i * sliceWidth;
-			const yPos = y + h / 2 + (amplitude * h) / 2;
-
-			vertex(xPos, yPos);
-		}
-		endShape();
-
-		pop();
+	setPosition() {
+		return this;
 	}
 }
 
-// Global instance
-const audioDebugDisplay = new AudioDebugDisplay();
-
+const debugPanel = new DebugPanel();
+// Backward-compatible alias used by README / older sketches
+const audioDebugDisplay = debugPanel;

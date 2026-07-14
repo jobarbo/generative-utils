@@ -105,12 +105,12 @@ class AudioKnob {
 		if (!this.initialized || !this.enabled) return;
 		if (typeof audioAnalyzer === "undefined") return;
 
+		// Always analyze — even if shaders aren't ready yet
+		audioAnalyzer.update();
+
 		if (typeof shaderEffects === "undefined" || typeof shaderEffects.updateEffectParam !== "function") {
 			return;
 		}
-
-		// Update audio analysis
-		audioAnalyzer.update();
 
 		// Handle beat pulse (smooth decay for frame-based animation)
 		if (audioAnalyzer.isBeat) {
