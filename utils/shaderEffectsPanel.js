@@ -3,6 +3,7 @@
  *
  * DOM overlay (similar to debugPanel) to enable/disable ShaderEffects
  * and edit numeric params live. Each effect is a collapsible drawer.
+ * Drag the ⠿ handle to reorder the render stack (top = first pass).
  *
  * Usage:
  *   shaderEffectsPanel.init(shaderEffects);
@@ -15,8 +16,9 @@ class ShaderEffectsPanel {
 		this.shaderEffects = null;
 		this.visible = false;
 		this.el = null;
-		this.drawers = new Map(); // effectName -> { root, body, open, inputs }
-		this._editing = false; // pause external value sync while dragging
+		this.drawers = new Map(); // effectName -> { root, body, toggle, inputs }
+		this._editing = false; // pause external value sync while dragging sliders
+		this._dragName = null;
 	}
 
 	/**
@@ -32,7 +34,7 @@ class ShaderEffectsPanel {
 		this._ensureDom();
 		this._rebuildDrawers();
 		this._applyVisibility();
-		console.log("[shaderEffectsPanel] ready — press E to toggle");
+		console.log("[shaderEffectsPanel] ready — press E to toggle (drag ⠿ to reorder)");
 		return this;
 	}
 
@@ -74,7 +76,7 @@ class ShaderEffectsPanel {
 		panel.innerHTML = `
 			<div class="shader-effects-panel__header">
 				<span class="shader-effects-panel__title">Shaders</span>
-				<span class="shader-effects-panel__hint">E</span>
+				<span class="shader-effects-panel__hint">E · drag ⠿</span>
 			</div>
 			<div class="shader-effects-panel__list" data-ref="list"></div>
 		`;
@@ -83,8 +85,70 @@ class ShaderEffectsPanel {
 		this.el = panel;
 		this.listEl = panel.querySelector("[data-ref='list']");
 
-		// Don't let key events / clicks fall through to the sketch oddly
 		panel.addEventListener("keydown", (e) => e.stopPropagation());
+		this._bindListDnD();
+	}
+
+	_bindListDnD() {
+		const list = this.listEl;
+		if (!list || list.dataset.dndBound) return;
+		list.dataset.dndBound = "1";
+
+		list.addEventListener("dragover", (e) => {
+			e.preventDefault();
+			const drawer = e.target.closest?.(".shader-effects-panel__drawer");
+			if (!drawer || !this._dragName) return;
+			e.dataTransfer.dropEffect = "move";
+
+			const rect = drawer.getBoundingClientRect();
+			const before = e.clientY < rect.top + rect.height / 2;
+			list.querySelectorAll(".shader-effects-panel__drawer").forEach((el) => {
+				el.classList.remove("is-drop-before", "is-drop-after");
+			});
+			drawer.classList.add(before ? "is-drop-before" : "is-drop-after");
+		});
+
+		list.addEventListener("dragleave", (e) => {
+			if (!list.contains(e.relatedTarget)) {
+				list.querySelectorAll(".shader-effects-panel__drawer").forEach((el) => {
+					el.classList.remove("is-drop-before", "is-drop-after");
+				});
+			}
+		});
+
+		list.addEventListener("drop", (e) => {
+			e.preventDefault();
+			const target = e.target.closest?.(".shader-effects-panel__drawer");
+			list.querySelectorAll(".shader-effects-panel__drawer").forEach((el) => {
+				el.classList.remove("is-drop-before", "is-drop-after", "is-dragging");
+			});
+
+			const fromName = this._dragName || e.dataTransfer.getData("text/plain");
+			this._dragName = null;
+			if (!fromName || !target) return;
+
+			const toName = target.dataset.effect;
+			if (!toName || toName === fromName) return;
+
+			const rect = target.getBoundingClientRect();
+			const placeBefore = e.clientY < rect.top + rect.height / 2;
+			this._reorderDomAndConfig(fromName, toName, placeBefore);
+		});
+	}
+
+	_reorderDomAndConfig(fromName, toName, placeBefore) {
+		const fromEl = this.drawers.get(fromName)?.root;
+		const toEl = this.drawers.get(toName)?.root;
+		if (!fromEl || !toEl || !this.listEl) return;
+
+		if (placeBefore) this.listEl.insertBefore(fromEl, toEl);
+		else this.listEl.insertBefore(fromEl, toEl.nextSibling);
+
+		const order = [...this.listEl.querySelectorAll(".shader-effects-panel__drawer")].map((el) => el.dataset.effect);
+		if (typeof this.shaderEffects.reorderEffects === "function") {
+			this.shaderEffects.reorderEffects(order);
+		}
+		console.log("[shaderEffectsPanel] order:", order.join(" → "));
 	}
 
 	_rebuildDrawers() {
@@ -107,6 +171,31 @@ class ShaderEffectsPanel {
 		const summary = document.createElement("summary");
 		summary.className = "shader-effects-panel__summary";
 
+		const handle = document.createElement("span");
+		handle.className = "shader-effects-panel__handle";
+		handle.textContent = "⠿";
+		handle.title = "Drag to reorder render stack";
+		handle.draggable = true;
+		handle.addEventListener("click", (e) => e.preventDefault());
+		handle.addEventListener("pointerdown", (e) => e.stopPropagation());
+		handle.addEventListener("dragstart", (e) => {
+			this._dragName = effectName;
+			drawer.classList.add("is-dragging");
+			e.dataTransfer.effectAllowed = "move";
+			e.dataTransfer.setData("text/plain", effectName);
+			try {
+				e.dataTransfer.setDragImage(drawer, 16, 16);
+			} catch (_) {
+				/* ignore */
+			}
+		});
+		handle.addEventListener("dragend", () => {
+			this._dragName = null;
+			this.listEl?.querySelectorAll(".shader-effects-panel__drawer").forEach((el) => {
+				el.classList.remove("is-dragging", "is-drop-before", "is-drop-after");
+			});
+		});
+
 		const toggle = document.createElement("input");
 		toggle.type = "checkbox";
 		toggle.className = "shader-effects-panel__enable";
@@ -122,6 +211,7 @@ class ShaderEffectsPanel {
 		label.className = "shader-effects-panel__name";
 		label.textContent = effectName;
 
+		summary.appendChild(handle);
 		summary.appendChild(toggle);
 		summary.appendChild(label);
 
@@ -159,9 +249,6 @@ class ShaderEffectsPanel {
 		return drawer;
 	}
 
-	/**
-	 * Params to expose: numbers / number arrays on the effect, excluding uniforms.
-	 */
 	_editableParams(effect) {
 		const out = [];
 		for (const [key, value] of Object.entries(effect)) {
@@ -292,9 +379,6 @@ class ShaderEffectsPanel {
 		}
 	}
 
-	/**
-	 * Pull latest values from effectsConfig into the sliders (unless user is dragging).
-	 */
 	syncFromConfig() {
 		if (!this.visible || this._editing || !this.shaderEffects) return;
 
@@ -307,7 +391,7 @@ class ShaderEffectsPanel {
 				drawer.root.classList.toggle("is-enabled", !!effect.enabled);
 			}
 
-			for (const [inputKey, control] of drawer.inputs) {
+			for (const [, control] of drawer.inputs) {
 				let value;
 				if (control.componentIndex != null) {
 					value = effect[control.key]?.[control.componentIndex];
@@ -327,7 +411,6 @@ class ShaderEffectsPanel {
 		}
 	}
 
-	/** Call from draw() while open so audio/MIDI-driven params stay visible. */
 	update() {
 		this.syncFromConfig();
 	}
