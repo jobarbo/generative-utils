@@ -420,9 +420,9 @@ function createDownloadButton() {
 		return;
 	}
 
-	// Wait a bit for the canvas to be ready
+	// Wait a bit for the canvas to be ready (p5 2.x may use ids other than defaultCanvas0)
 	setTimeout(() => {
-		const canvas = document.getElementById("defaultCanvas0");
+		const canvas = document.getElementById("defaultCanvas0") || document.querySelector("canvas");
 		if (!canvas) {
 			console.log("Canvas not ready yet, retrying...");
 			createDownloadButton();

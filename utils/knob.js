@@ -30,11 +30,15 @@ let currentPage = 0;
 
 if (navigator.requestMIDIAccess) {
 	navigator.requestMIDIAccess().then(function (midi) {
-		const inputs = midi.inputs.values();
-		const xtouch = [...inputs].filter((v) => v.name === "Grid")[0];
+		const inputs = [...midi.inputs.values()];
+		const xtouch = inputs.filter((v) => v.name === "Grid")[0];
 		console.log(inputs);
-
 		console.log(xtouch);
+
+		if (!xtouch) {
+			console.log("[knob] MIDI device 'Grid' not found — MIDI knobs disabled");
+			return;
+		}
 
 		xtouch.onmidimessage = ({data}) => {
 			const [status, controller, value] = data;
