@@ -220,7 +220,6 @@ library/
 │   ├── memoryManager.js   # Memory management
 │   ├── stopMotionController.js  # Stop-motion system
 │   ├── paramsPanel.js     # Control panel UI
-│   ├── paramsPanel.css    # Control panel styles
 │   ├── chromaPalette.js   # Hex palette manager
 │   ├── shaderManager.js   # Shader effects
 │   ├── shaderPipeline.js  # Shader pipeline
@@ -233,6 +232,8 @@ library/
 ├── README-STOPMOTION.md
 ├── README-PARAMS-PANEL.md
 ├── README-AUDIO.md
+├── styles/
+│   └── paramsPanel.css    # Control panel styles
 ├── p5/                    # P5.js and extensions
 └── shaders/               # GLSL shader files
 ```

@@ -9,7 +9,7 @@ Builds dropdowns from `window.PARAMS_UI`, syncs on **Apply**, and optionally inc
 ### 1. HTML chrome + assets
 
 ```html
-<link rel="stylesheet" href="./library/utils/paramsPanel.css" />
+<link rel="stylesheet" href="./library/styles/paramsPanel.css" />
 
 <!-- after params.js -->
 <script src="./library/utils/paramsPanel.js"></script>
