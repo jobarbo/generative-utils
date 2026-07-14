@@ -84,6 +84,23 @@ Color palette management:
 - HSL color conversion
 - Palette sampling utilities
 
+#### **chromaPalette.js**
+
+Hex-array palette manager (Chroma.js scales):
+
+- File + local (localStorage) palette sources
+- Deterministic file-only pool via `getFileNames()`
+- Used with ParamsPanel palette creator
+
+#### **paramsPanel.js** 🎛️
+
+EXLIBRIS-style slide-out control panel:
+
+- Metadata-driven `<select>` rows from `PARAMS_UI.ui`
+- Apply / Download / render status spinner
+- Optional custom palette creator + presentation mode
+- **See:** `README-PARAMS-PANEL.md` for full documentation
+
 ### P5.js Extensions
 
 Located in `p5/` directory:
@@ -202,15 +219,20 @@ library/
 │   ├── logs.js            # Enhanced logging
 │   ├── memoryManager.js   # Memory management
 │   ├── stopMotionController.js  # Stop-motion system
+│   ├── paramsPanel.js     # Control panel UI
+│   ├── paramsPanel.css    # Control panel styles
+│   ├── chromaPalette.js   # Hex palette manager
 │   ├── shaderManager.js   # Shader effects
 │   ├── shaderPipeline.js  # Shader pipeline
 │   ├── smudge.js          # Smudge effects
 │   ├── horizon.js         # Horizon utilities
-│   ├── knob.js            # UI controls
+│   ├── knob.js            # MIDI / live controls
 │   ├── fxhash.js          # FXHash integration
-│   ├── swatchPalette.js   # Color palettes
-│   ├── README-STOPMOTION.md       # Stop motion docs
-│   └── STOP_MOTION_EXAMPLE.js    # Stop motion examples
+│   ├── swatchPalette.js   # Image swatch palettes
+│   └── STOP_MOTION_EXAMPLE.js
+├── README-STOPMOTION.md
+├── README-PARAMS-PANEL.md
+├── README-AUDIO.md
 ├── p5/                    # P5.js and extensions
 └── shaders/               # GLSL shader files
 ```

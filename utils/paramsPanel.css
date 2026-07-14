@@ -1,0 +1,493 @@
+/* ==========================================================================
+   ParamsPanel — EXLIBRIS-style slide-out control panel
+   Link from index.html: <link rel="stylesheet" href="./library/utils/paramsPanel.css" />
+   ========================================================================== */
+
+:root {
+	--color-text: #ffffff;
+	--params-panel-frame: #e1b88e;
+}
+
+/* ---- Presentation mode (opt-in feature) ---- */
+
+main.main {
+	position: relative;
+}
+
+span.frame {
+	position: absolute;
+	top: 0;
+	left: 0;
+	visibility: hidden;
+	opacity: 0;
+	border: var(--params-panel-frame) 0.9vh solid;
+	width: 100%;
+	height: 100%;
+	z-index: 4;
+	transform: rotate(0deg);
+	box-shadow:
+		inset 2.8px 2.8px 2.2px rgba(0, 0, 0, 0),
+		inset 0px 0px 5px 1px rgba(0, 0, 0, 0);
+	transition:
+		opacity 0.2s ease-in-out,
+		transform 0.2s ease-in-out,
+		box-shadow 0.2s ease-in-out 0.2s;
+	pointer-events: none;
+}
+
+span.frame.presentation {
+	visibility: visible;
+	opacity: 1;
+	box-shadow:
+		inset 0px 0px 0.3px rgba(0, 0, 0, -0.09),
+		inset 0px 0px 0.9px rgba(0, 0, 0, -0.026),
+		inset 0px 0px 1.8px rgba(0, 0, 0, 0.068),
+		inset 0px 0px 3.7px rgba(0, 0, 0, 0.185),
+		inset 0px 0px 10px rgba(0, 0, 0, 0.33);
+}
+
+span.frame.presentation.horizontal {
+	transform: rotate(90deg);
+}
+
+canvas.p5Canvas.presentation {
+	max-height: 85vh;
+	max-width: 85vw;
+	box-shadow:
+		2.8px 2.8px 2.2px rgba(0, 0, 0, 0.05),
+		6.7px 6.7px 5.3px rgba(0, 0, 0, 0.065),
+		12.5px 12.5px 10px rgba(0, 0, 0, 0.072),
+		22.3px 22.3px 17.9px rgba(0, 0, 0, 0.074),
+		41.8px 41.8px 33.4px rgba(0, 0, 0, 0.073),
+		100px 100px 80px rgba(0, 0, 0, 0.07);
+	transition: 0.2s ease-in-out;
+}
+
+canvas.p5Canvas.presentation.horizontal {
+	transform: rotate(90deg);
+	max-width: 85vh;
+	max-height: 85vw;
+}
+
+/* ---- Slide-out panel chrome ---- */
+
+.container {
+	z-index: 10002;
+	position: absolute;
+	width: clamp(40px, 27.78vw, 1570px);
+	top: 0;
+	left: 0;
+	display: block;
+	grid-template-columns: 1fr;
+	max-width: 100vw;
+	max-height: 100vh;
+	overflow-x: hidden;
+	overflow-y: auto;
+	background-color: rgba(0, 0, 0, 0.572);
+	backdrop-filter: blur(16px);
+	transform: translateX(-100%);
+	box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0);
+	padding: clamp(1.5em, 0.83vw, 2.5em) clamp(1.5em, 0.83vw, 2.5em) clamp(1.5em, 0.83vw, 2.5em) clamp(1.5em, 0.83vw, 2.5em);
+	transition: 0.2s ease-in-out;
+}
+
+.container.show {
+	transform: translateX(0%);
+	box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.3);
+}
+
+.title-wrapper {
+	margin-bottom: 1em;
+}
+
+.info-wrapper {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: flex-start;
+	max-width: 100%;
+	position: relative;
+}
+
+.info-container {
+	width: 100%;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	position: relative;
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	font-size: clamp(10px, 0.86vw, 22px);
+	gap: 0.5em;
+	padding: 0.5em 0;
+}
+
+.info-container span {
+	color: var(--color-text);
+}
+
+.info-container .hash {
+	word-break: break-word;
+}
+
+.spec {
+	color: var(--color-text);
+	font-weight: 400;
+	font-family: helvetica, arial, sans-serif;
+}
+
+.title {
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	margin-bottom: -0.1em;
+	color: var(--color-text);
+}
+
+.status {
+	display: flex;
+	padding: 0.5em 1em;
+	border: var(--color-text) 1px solid;
+	border-radius: 50px;
+	width: fit-content;
+	font-size: clamp(10px, 0.66vw, 22px);
+	margin-top: 1em;
+	font-family: helvetica, arial, sans-serif;
+	color: var(--color-text);
+}
+
+@keyframes params-panel-spin {
+	0% {
+		transform-origin: center center;
+		transform: rotate(0deg);
+	}
+	100% {
+		transform-origin: center center;
+		transform: rotate(360deg);
+	}
+}
+
+.spin {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	border-radius: 50%;
+	text-align: center;
+	line-height: 0;
+	margin: 0;
+	padding: 0;
+	width: 0;
+	height: 0;
+	font-size: 20px;
+	color: black;
+	margin-bottom: 5px;
+}
+
+.spin-container {
+	margin-left: 0.5em;
+	width: 1em;
+	height: 1em;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	transform-origin: center center;
+	background-color: rgb(37, 244, 5);
+	border-radius: 50%;
+	align-self: center;
+}
+
+.spin-container.active {
+	background-color: rgb(255, 177, 8);
+	animation: params-panel-spin 1s linear infinite;
+}
+
+.container hr {
+	margin: 0;
+	width: 100%;
+	border: 0.5px solid rgba(255, 255, 255, 0.65);
+}
+
+.info-toggle {
+	position: absolute;
+	top: 5vh;
+	right: 5vh;
+	padding: 1.25em 1.5em;
+	display: none;
+	justify-content: center;
+	align-items: center;
+	cursor: pointer;
+	color: var(--color-text);
+	background-color: black;
+	border-radius: 5px;
+	z-index: 10003;
+	font-family: helvetica, arial, sans-serif;
+	line-height: 1;
+	font-size: clamp(10px, 0.66vw, 22px);
+	font-weight: 400;
+	transform: scale(1);
+	transition: 0.2s ease-in-out;
+}
+
+.info-toggle.show {
+	display: flex;
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	font-size: clamp(10px, 0.66vw, 22px);
+	letter-spacing: 0.05em;
+}
+
+.controls-form {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: clamp(8px, 0.44vw, 10px);
+	padding: 1.5em 0;
+}
+
+.select-row {
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	align-items: flex-start;
+	gap: clamp(8px, 0.44vw, 12px);
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	font-size: clamp(8px, 0.66vw, 22px);
+}
+
+.select-row span {
+	color: var(--color-text);
+}
+
+.select-row select {
+	min-width: clamp(40px, 8.78vw, 570px);
+	width: 100%;
+	padding: clamp(6px, 0.33vw, 10px) clamp(8px, 0.44vw, 10px);
+	border-radius: 10px;
+	border: 2px solid rgba(0, 0, 0, 0.85);
+	background: rgba(255, 255, 255, 0.8);
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	font-size: clamp(8px, 0.66vw, 22px);
+}
+
+.save-wrapper {
+	display: flex;
+	position: relative;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	margin-top: clamp(8px, 0.66vw, 14px);
+}
+
+.button {
+	position: relative;
+	background-color: transparent;
+	border: none;
+	padding: 0.6em 1.2em;
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	font-size: clamp(8px, 0.83vw, 22px);
+	cursor: pointer;
+	border-radius: 50px;
+	overflow: hidden;
+	border: black 2px solid;
+	transition: 0.2s ease-in-out;
+	width: 100%;
+}
+
+.button span {
+	position: relative;
+	color: var(--color-text);
+	z-index: 1;
+	transition: 0.2s ease-in-out;
+}
+
+.button::after {
+	content: "";
+	display: block;
+	position: absolute;
+	top: -2%;
+	left: -2%;
+	width: 106%;
+	height: 106%;
+	z-index: -1;
+	border-radius: 50px;
+	will-change: transform;
+	background-color: black;
+	transform: translateY(0%);
+	transition: 0.2s ease-in-out;
+}
+
+.button:hover {
+	background-color: white;
+}
+
+.button:hover span {
+	color: black;
+}
+
+.button:hover::after {
+	transform: translateY(100%);
+	opacity: 1;
+	transition: 0.2s ease-in-out;
+}
+
+/* ---- Palette gradient preview ---- */
+
+.palette-preview {
+	height: clamp(10px, 0.9vw, 16px);
+	border-radius: 8px;
+	margin: 0 0 clamp(4px, 0.3vw, 8px);
+	border: 2px solid rgba(0, 0, 0, 0.85);
+	background: rgba(255, 255, 255, 0.15);
+}
+
+/* ---- Custom palette creator ---- */
+
+.palette-creator {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-direction: column;
+	gap: clamp(8px, 0.5vw, 12px);
+	margin-top: clamp(12px, 0.9vw, 20px);
+	padding: clamp(10px, 0.8vw, 16px);
+	border: none;
+	border-top: 2px dashed rgba(255, 255, 255, 0.3);
+	background: rgba(255, 255, 255, 0.06);
+	border-radius: 10px;
+	font-family: helvetica, arial, sans-serif;
+}
+
+.palette-creator legend {
+	padding: 0 0.4em 0 0;
+	font-size: clamp(9px, 0.72vw, 20px);
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	color: var(--color-text);
+	opacity: 0.75;
+}
+
+.palette-creator input[type="text"],
+.palette-creator textarea {
+	width: 100%;
+	padding: clamp(6px, 0.33vw, 10px) clamp(8px, 0.44vw, 10px);
+	border-radius: 10px;
+	border: 2px solid rgba(0, 0, 0, 0.85);
+	background: rgba(255, 255, 255, 0.8);
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	font-size: clamp(8px, 0.66vw, 20px);
+}
+
+.palette-creator textarea {
+	resize: vertical;
+	font-family: monospace;
+	font-size: clamp(8px, 0.6vw, 16px);
+	min-height: 3.4em;
+}
+
+.palette-creator .palette-config-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: clamp(6px, 0.4vw, 10px);
+	align-items: center;
+}
+
+.palette-creator select {
+	padding: clamp(6px, 0.33vw, 10px) clamp(8px, 0.44vw, 10px);
+	border-radius: 10px;
+	border: 2px solid rgba(0, 0, 0, 0.85);
+	background: rgba(255, 255, 255, 0.8);
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	font-size: clamp(8px, 0.66vw, 20px);
+}
+
+.palette-creator input[type="number"] {
+	width: clamp(56px, 4.5vw, 80px);
+	padding: clamp(6px, 0.33vw, 10px) clamp(8px, 0.44vw, 10px);
+	border-radius: 10px;
+	border: 2px solid rgba(0, 0, 0, 0.85);
+	background: rgba(255, 255, 255, 0.8);
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	font-size: clamp(8px, 0.66vw, 20px);
+}
+
+.palette-creator .palette-discrete-label {
+	display: flex;
+	align-items: center;
+	gap: 0.4em;
+	font-size: clamp(8px, 0.6vw, 18px);
+	color: var(--color-text);
+	opacity: 0.85;
+}
+
+.palette-creator .palette-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: clamp(6px, 0.4vw, 10px);
+}
+
+.palette-creator .palette-actions .button {
+	width: auto;
+	padding: 0.5em 1em;
+	font-size: clamp(8px, 0.72vw, 18px);
+}
+
+.palette-creator .palette-actions .btn-save {
+	border-color: #3fa564;
+}
+.palette-creator .palette-actions .btn-save::after {
+	background-color: #3fa564;
+}
+
+.palette-creator .palette-actions .btn-delete {
+	border-color: #d15b5b;
+}
+.palette-creator .palette-actions .btn-delete::after {
+	background-color: #d15b5b;
+}
+
+.palette-creator .palette-status {
+	font-size: clamp(8px, 0.6vw, 16px);
+	min-height: 1.2em;
+	color: var(--color-text);
+	opacity: 0.85;
+}
+
+.palette-creator .palette-status.is-error {
+	color: #ff9b9b;
+	opacity: 1;
+}
+
+@media (max-width: 1024px) {
+	.container {
+		width: 100vw;
+		max-height: 100vh;
+		overflow-y: auto;
+		transform: translateY(-100%);
+		transition: 0.2s ease-in-out;
+		padding: 1.5em 1em 1.5em 1em;
+		border-right: none;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+	}
+
+	.container.show {
+		transform: translateY(0%);
+	}
+
+	.info-toggle {
+		top: 1em;
+		right: 1em;
+		font-size: 14px;
+	}
+
+	.select-row {
+		font-size: 12px;
+	}
+
+	.select-row select {
+		min-width: 150px;
+	}
+}

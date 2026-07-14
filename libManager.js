@@ -24,6 +24,8 @@ class LibManager {
 			smudge: "./library/utils/smudge.js",
 			horizon: "./library/utils/horizon.js",
 			knob: "./library/utils/knob.js",
+			paramsPanel: "./library/utils/paramsPanel.js",
+			chromaPalette: "./library/utils/chromaPalette.js",
 
 			// Core libraries
 			fxhash: "./library/utils/fxhash.js",
@@ -42,6 +44,8 @@ class LibManager {
 		this.dependencies.set("shader", ["logs"]);
 		this.dependencies.set("shaderPipeline", ["shader"]);
 		this.dependencies.set("params", ["fxhash"]); // params needs fxhash
+		this.dependencies.set("paramsPanel", ["params"]);
+		this.dependencies.set("chromaPalette", []);
 
 		// Global exports for each module
 		this.moduleExports = new Map();
@@ -186,6 +190,18 @@ class LibManager {
 			case "stopMotion":
 				this.modules.set(moduleName, {
 					StopMotionController: window.StopMotionController,
+				});
+				break;
+
+			case "paramsPanel":
+				this.modules.set(moduleName, {
+					ParamsPanel: window.ParamsPanel,
+				});
+				break;
+
+			case "chromaPalette":
+				this.modules.set(moduleName, {
+					ChromaPalette: window.ChromaPalette,
 				});
 				break;
 
