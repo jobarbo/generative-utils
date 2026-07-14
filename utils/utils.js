@@ -19,15 +19,87 @@ function isSafariMobile() {
 	return iOSSafari;
 }
 
+// Load user-created palettes persisted by the params UI (browser-only, never
+// part of the deterministic fxrand pool — see ChromaPalette.getFileNames)
+function loadLocalPalettes(manager, storageKey = "fx_longform2:userPalettes") {
+	let stored;
+	try {
+		stored = JSON.parse(localStorage.getItem(storageKey)) || {};
+	} catch {
+		return;
+	}
+	for (const [name, def] of Object.entries(stored)) {
+		try {
+			if (manager.getConfig(name)?.source === "file") {
+				console.warn(`Local palette '${name}' shadows a file palette — skipped`);
+				continue;
+			}
+			manager.addPalette(name, def, {source: "local"});
+		} catch (error) {
+			console.warn(`Skipping invalid local palette '${name}':`, error.message);
+		}
+	}
+}
+
+/**
+ * Build a ChromaPalette from file defs + optional localStorage overlays.
+ * @param {Object} [opts]
+ * @param {Object} [opts.defaults] - ChromaPalette defaults ({ mode, steps })
+ * @param {Object} [opts.palettes] - { name: def, ... } file palettes
+ * @param {string} [opts.storageKey] - localStorage key for user palettes
+ * @param {boolean} [opts.exposeGlobal=true] - set window.paletteManager
+ * @param {boolean} [opts.loadLocal=true] - merge localStorage palettes
+ * @returns {{ manager: ChromaPalette, ready: boolean }}
+ */
+function initChromaPalettes({defaults, palettes = {}, storageKey, exposeGlobal = true, loadLocal = true} = {}) {
+	const manager = new ChromaPalette(defaults);
+	manager.addPalettes(palettes, {source: "file"});
+	if (loadLocal) {
+		loadLocalPalettes(manager, storageKey);
+	}
+	if (exposeGlobal) {
+		window.paletteManager = manager;
+	}
+	return {manager, ready: manager.isReady()};
+}
+
+/**
+ * Whether shaders are enabled and the global shaderEffects object exists.
+ * @param {boolean} [flag=true] - project-level ENABLE_SHADERS toggle
+ */
+function shadersEnabled(flag = true) {
+	return !!flag && typeof shaderEffects !== "undefined";
+}
+
+/**
+ * Bust p5's internal style cache when drawing code writes to drawingContext directly.
+ * Call before re-init / Apply so the next g.fill(...) re-applies fillStyle.
+ */
+function flushGraphicsStyleCache(g) {
+	if (!g?.fill || !g?.colorMode) return;
+	try {
+		g.push();
+		g.colorMode(RGB, 255, 255, 255, 255);
+		g.fill(255, 0, 255, 255); // unlikely to match any intended fill
+		g.noStroke();
+		g.pop();
+	} catch {
+		// ignore
+	}
+}
+
 let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 let smoothstep = (a, b, x) => (((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
 let mix = (a, b, p) => a + p * (b - a);
-function dot(v1, v2) {
+
+// Array[2] dot product — use var (not function) so p5 can bind its own global `dot`.
+var vec2Dot = function (v1, v2) {
 	if (v1.length !== 2 || v2.length !== 2) {
 		throw new Error("Both vectors should have exactly 2 elements.");
 	}
 	return v1[0] * v2[0] + v1[1] * v2[1];
-}
+};
+
 let subtract = (v1, v2) => ({x: v1.x - v2.x, y: v1.y - v2.y});
 let multiply = (v1, v2) => ({x: v1.x * v2.x, y: v1.y * v2.y});
 let length = (v) => Math.sqrt(v.x * v.x + v.y * v.y);
@@ -169,9 +241,9 @@ function sdf_box([x, y], [cx, cy], [w, h], r = 0) {
 	let dx = abs(x) - w + r;
 	let dy = abs(y) - h + r;
 	// External distance
-	let external = L(max(dx, 0), max(dy, 0)) - r;
+	let external = L(Math.max(dx, 0), Math.max(dy, 0)) - r;
 	// Internal distance
-	let internal = min(max(dx, dy), 0);
+	let internal = Math.min(Math.max(dx, dy), 0);
 	return external + internal;
 }
 
@@ -277,10 +349,12 @@ function truncateNoiseCoord(val, p = 5) {
 	return Math.round(val * 10 ** p) / 10 ** p;
 }
 
-// if cmd + s is pressed, save the canvas'
-function saveCanvas(event) {
+// if cmd + s is pressed, save the canvas
+// Named to avoid colliding with p5's global saveCanvas (browsers make
+// top-level function declarations non-configurable on window).
+function handleSaveCanvasShortcut(event) {
 	const logger = window.Logger || console;
-	logger.debug ? logger.debug("saveCanvas function called") : logger.log("saveCanvas function called");
+	logger.debug ? logger.debug("handleSaveCanvasShortcut called") : logger.log("handleSaveCanvasShortcut called");
 	if (event.key === "s" && (event.metaKey || event.ctrlKey)) {
 		logger.info ? logger.info("Save shortcut detected") : logger.log("Save shortcut detected");
 		saveArtwork();
@@ -289,8 +363,7 @@ function saveCanvas(event) {
 	}
 }
 
-// Example usage to add an event listener for key presses
-document.addEventListener("keydown", saveCanvas);
+document.addEventListener("keydown", handleSaveCanvasShortcut);
 document.addEventListener("keydown", toggleGuides);
 
 // Function to toggle guide lines visibility
@@ -394,14 +467,6 @@ function createDownloadButtonUI() {
 		`;
 		document.body.appendChild(downloadButton);
 	}
-}
-
-function max(a, b) {
-	return a > b ? a : b;
-}
-
-function min(a, b) {
-	return a < b ? a : b;
 }
 
 // url search params
@@ -653,5 +718,176 @@ function resizeP5Canvas(w, h) {
 	if (typeof resizeCanvas === "function") {
 		resizeCanvas(w, h);
 		_updateP5Scaling();
+	}
+}
+
+// ============================================================================
+// SKETCH DRAW LOOP / CONTROLS / DEBUG OVERLAY
+// ============================================================================
+
+/**
+ * Create a rAF draw loop that advances a generator and optionally runs shaderEffects.
+ * @param {Object} opts
+ * @param {() => Generator} opts.getGenerator
+ * @param {() => boolean} opts.isShadersEnabled
+ * @param {() => *} opts.getShaderCanvas
+ * @param {() => *} opts.getMainCanvas
+ * @returns {{ start: Function, stop: Function }}
+ */
+function createSketchDrawLoop({getGenerator, isShadersEnabled, getShaderCanvas, getMainCanvas}) {
+	let animationFrameId = null;
+
+	function tick() {
+		const generator = typeof getGenerator === "function" ? getGenerator() : null;
+		if (!generator) return;
+
+		const result = generator.next();
+		const shadersOn = typeof isShadersEnabled === "function" ? isShadersEnabled() : false;
+		const shaderCanvas = typeof getShaderCanvas === "function" ? getShaderCanvas() : null;
+		const mainCanvas = typeof getMainCanvas === "function" ? getMainCanvas() : null;
+
+		if (shadersOn && shaderCanvas) {
+			const shouldContinue = shaderEffects.renderFrame(result.done, tick);
+			if (shouldContinue) {
+				animationFrameId = requestAnimationFrame(tick);
+			}
+		} else {
+			clear();
+			image(mainCanvas, 0, 0);
+			if (shadersOn) {
+				shaderEffects.updateFPS();
+				shaderEffects.drawFPS();
+			}
+			if (!result.done) {
+				animationFrameId = requestAnimationFrame(tick);
+			}
+		}
+	}
+
+	return {
+		start() {
+			tick();
+		},
+		stop() {
+			if (animationFrameId !== null) {
+				try {
+					cancelAnimationFrame(animationFrameId);
+				} catch {
+					// ignore
+				}
+				animationFrameId = null;
+			}
+		},
+	};
+}
+
+function setFpsButtonState(toggleFpsButton, {showFpsUi = true, checkShaders = () => true} = {}) {
+	if (!toggleFpsButton || !showFpsUi || !checkShaders()) return;
+	if (shaderEffects.showFPS) {
+		toggleFpsButton.classList.add("active");
+		toggleFpsButton.textContent = "FPS: ON";
+	} else {
+		toggleFpsButton.classList.remove("active");
+		toggleFpsButton.textContent = "FPS: OFF";
+	}
+}
+
+function toggleFps(from = "unknown", {showFpsUi = true, checkShaders = () => true, buttonId = "toggle-fps"} = {}) {
+	if (!showFpsUi) return;
+	if (!checkShaders()) return;
+	if (typeof isInIframe === "function" && isInIframe()) return;
+
+	shaderEffects.toggleFPS();
+	setFpsButtonState(document.getElementById(buttonId), {showFpsUi, checkShaders});
+	console.log(`FPS counter toggled (${from}): `, shaderEffects.showFPS);
+}
+
+/**
+ * Wire optional mobile FPS / download controls (#controls).
+ * @param {Object} [opts]
+ * @param {boolean} [opts.showFps=false]
+ * @param {boolean} [opts.showDownload=false]
+ * @param {() => boolean} [opts.checkShaders]
+ */
+function setupControls({showFps = false, showDownload = false, checkShaders = () => true} = {}) {
+	const controlsContainer = document.getElementById("controls");
+	if (!controlsContainer) return;
+
+	if (typeof isInIframe === "function" && isInIframe()) {
+		controlsContainer.style.display = "none";
+		return;
+	}
+
+	if (!showFps && !showDownload) {
+		controlsContainer.style.display = "none";
+		return;
+	}
+
+	const toggleFpsButton = document.getElementById("toggle-fps");
+	if (!toggleFpsButton) return;
+	if (!showFps) {
+		toggleFpsButton.style.display = "none";
+		return;
+	}
+
+	toggleFpsButton.addEventListener("click", function () {
+		toggleFps("button", {showFpsUi: showFps, checkShaders});
+	});
+
+	setFpsButtonState(toggleFpsButton, {showFpsUi: showFps, checkShaders});
+}
+
+/**
+ * Position CSS debug overlays over the p5 canvas.
+ * @param {Object} [opts]
+ * @param {boolean} [opts.debugBounds]
+ * @param {number} [opts.padding] - normalized artwork padding (0–1)
+ * @param {Array} [opts.movers] - movers with minBoundX/Y maxBoundX/Y
+ */
+function updateDebugOverlay({
+	debugBounds = false,
+	padding = 0.1,
+	movers = [],
+	overlayId = "debug-bounds",
+	basePaddingId = "debug-base-padding",
+	moverBoundsId = "debug-mover-bounds",
+} = {}) {
+	const debugOverlay = document.getElementById(overlayId);
+	const basePaddingEl = document.getElementById(basePaddingId);
+	const moverBoundsEl = document.getElementById(moverBoundsId);
+	if (!debugOverlay) return;
+
+	if (!debugBounds) {
+		debugOverlay.classList.remove("visible");
+		return;
+	}
+
+	debugOverlay.classList.add("visible");
+
+	const canvas = document.querySelector("canvas");
+	if (!canvas) return;
+
+	const canvasRect = canvas.getBoundingClientRect();
+	const canvasWidth = canvasRect.width;
+	const canvasHeight = canvasRect.height;
+
+	debugOverlay.style.left = canvasRect.left + "px";
+	debugOverlay.style.top = canvasRect.top + "px";
+	debugOverlay.style.width = canvasWidth + "px";
+	debugOverlay.style.height = canvasHeight + "px";
+
+	if (basePaddingEl) {
+		basePaddingEl.style.left = padding * canvasWidth + "px";
+		basePaddingEl.style.top = padding * canvasHeight + "px";
+		basePaddingEl.style.width = (1 - 2 * padding) * canvasWidth + "px";
+		basePaddingEl.style.height = (1 - 2 * padding) * canvasHeight + "px";
+	}
+
+	if (moverBoundsEl && movers.length > 0) {
+		const m = movers[0];
+		moverBoundsEl.style.left = m.minBoundX + "px";
+		moverBoundsEl.style.top = m.minBoundY + "px";
+		moverBoundsEl.style.width = m.maxBoundX - m.minBoundX + "px";
+		moverBoundsEl.style.height = m.maxBoundY - m.minBoundY + "px";
 	}
 }

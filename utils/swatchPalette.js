@@ -43,29 +43,11 @@ class SwatchPalette {
 	 * @returns {Promise} Promise that resolves when swatch is loaded
 	 */
 	async loadSwatch(swatchName) {
-		return new Promise((resolve, reject) => {
-			const swatchPath = `swatches/${swatchName}`;
-
-			// Use p5.js loadImage function
-			loadImage(
-				swatchPath,
-				(img) => {
-					try {
-						this.loadedImages.set(swatchName, img);
-						const colors = this.extractColorsFromImage(img);
-						this.swatches.set(swatchName, colors);
-						resolve();
-					} catch (error) {
-						console.error(`Failed to extract colors from ${swatchName}:`, error);
-						reject(error);
-					}
-				},
-				(error) => {
-					console.error(`Failed to load image ${swatchPath}:`, error);
-					reject(error);
-				}
-			);
-		});
+		const swatchPath = `swatches/${swatchName}`;
+		const img = await loadImage(swatchPath);
+		this.loadedImages.set(swatchName, img);
+		const colors = this.extractColorsFromImage(img);
+		this.swatches.set(swatchName, colors);
 	}
 
 	/**

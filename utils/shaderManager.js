@@ -38,12 +38,12 @@ class ShaderManager {
 	}
 
 	/**
-	 * Load a shader
+	 * Load a shader (async in p5.js 2.0)
 	 * @param {string} name - Name to reference the shader
 	 * @param {string} fragPath - Path to the fragment shader (relative to basePath)
 	 * @param {string} vertPath - Path to the vertex shader (optional, uses default if not provided)
 	 */
-	loadShader(name, fragPath, vertPath = null) {
+	async loadShader(name, fragPath, vertPath = null) {
 		const vertexPath = vertPath ? this.basePath + vertPath : this.defaultVertexPath;
 		const fragmentPath = this.basePath + fragPath;
 
@@ -52,7 +52,7 @@ class ShaderManager {
 			return this;
 		}
 
-		this.shaders[name] = this.p5Instance.loadShader(vertexPath, fragmentPath);
+		this.shaders[name] = await this.p5Instance.loadShader(vertexPath, fragmentPath);
 		return this;
 	}
 
