@@ -1,280 +1,239 @@
 # Audio Reactivity Guide
 
-This guide shows you how to make your shaders audio-reactive for live VJ performances.
+Make shader effects react to sound using `audioAnalyzer` and `shaderEffects.updateEffectParam()`.
 
-## Quick Start with MIDI Chime (Easiest!)
+> **Note:** There is no `shaderEffects.enableAudio()` and no `audioBass` / `audioVolume` strings inside `effectsConfig`. Drive numeric effect params from the sketch each frame.
 
-The MIDI chime lets you test audio-reactivity without needing a microphone or external audio source.
+## Scripts to load
 
-### 1. Enable Audio with MIDI Chime
+Add these to `index.html` (before `sketch.js`):
 
-In your `sketch.js` setup function:
+```html
+<script src="./library/p5/p5.sound.min.js"></script>
+<script src="./library/utils/audioAnalyzer.js"></script>
+<script src="./library/utils/midiChime.js"></script>
+<script src="./library/utils/audioDebugDisplay.js"></script>
+```
+
+## Quick Start with MIDI Chime
 
 ```javascript
 function setup() {
-	// ... your existing setup code ...
+	// ... existing setup ...
 
-	// Enable audio reactivity with MIDI chime (built-in synthesizer)
-	shaderEffects.enableAudio("chime", {
+	audioAnalyzer.init("chime", {
 		smoothing: 0.85,
 		beatThreshold: 0.15,
-		chimeOptions: {
-			pattern: "chords", // 'chords', 'scale', 'bassline', 'arpeggio', 'random'
-			autoPlayInterval: 500, // ms between notes/chords
-		},
 	});
 
-	// Enable keyboard controls
+	midiChime.init({
+		pattern: "chords", // 'chords', 'scale', 'bassline', 'arpeggio', 'drums', 'random'
+		autoPlayInterval: 500,
+	});
+
 	enableMidiKeyboard();
+	audioDebugDisplay.init(audioAnalyzer); // press V to toggle
 }
 ```
 
-### Keyboard Controls
+### Keyboard controls
 
-- `SPACE` - Toggle auto-play
-- `A-K` - Play notes (C major scale)
-- `1-5` - Play chords
-- `Z,X,C` - Drums (kick, snare, hi-hat)
+- `SPACE` — toggle auto-play
+- `A–K` — notes (C major scale)
+- `1–5` — chords
+- `Z`, `X`, `C` — kick, snare, hi-hat
+- `V` — toggle audio debug display
 
-## Using Microphone Instead
+### Test patterns
 
-```javascript
-function setup() {
-	// ... your existing setup code ...
+| Pattern | Good for |
+| --- | --- |
+| `chords` | overall energy |
+| `bassline` | bass response |
+| `arpeggio` | rapid changes |
+| `drums` | beat detection |
+| `scale` / `random` | general testing |
 
-	// Enable audio reactivity with microphone (user will be prompted for access)
-	shaderEffects.enableAudio("microphone", {
-		smoothing: 0.8, // 0-1, higher = smoother (default: 0.8)
-		beatThreshold: 0.15, // 0-1, sensitivity for beat detection (default: 0.15)
-		fftBands: 1024, // FFT resolution: 16, 32, 64, 128, 256, 512, 1024 (default: 1024)
-		fftSmoothing: 0.8, // 0-1, FFT smoothing (default: 0.8)
-	});
-}
-```
-
-### 2. Make Shaders Audio-Reactive
-
-In `shaders/sketch-shaders.js`, modify your `effectsConfig` to use audio variables:
+## Using the microphone
 
 ```javascript
-effectsConfig = {
-	deform: {
-		enabled: true,
-		amount: 0.1,
-		uniforms: {
-			// Make deformation intensity follow bass frequencies
-			uAmount: "amount * (1 + audioBass * 2)",
-			uTime: "shaderTime",
-			uSeed: "shaderSeed",
-			uOctave: "4.0",
-		},
-	},
-
-	chromatic: {
-		enabled: true,
-		amount: 0.0025,
-		uniforms: {
-			// Chromatic aberration pulses with overall energy
-			uAmount: "amount * (1 + audioEnergy * 5)",
-			uTime: "shaderTime",
-			uSeed: "shaderSeed + 777.0",
-		},
-	},
-
-	pixelSort: {
-		enabled: true,
-		angle: 0.0,
-		threshold: 0.3,
-		sortAmount: 0.8,
-		uniforms: {
-			// Rotate based on mid frequencies
-			uAngle: "angle + audioMid * 3.14159",
-			// Threshold follows volume
-			uThreshold: "threshold * (1 - audioVolume * 0.5)",
-			uSortAmount: "sortAmount",
-			uSampleCount: "32.0",
-			uInvert: "0.0",
-			uSortMode: "1.0",
-			uTime: "shaderTime",
-			uSeed: "shaderSeed + 999.0",
-			uResolution: "[width, height]",
-		},
-	},
-
-	grain: {
-		enabled: true,
-		amount: 0.1,
-		uniforms: {
-			// Grain intensity follows treble (cymbals, hi-hats)
-			uAmount: "amount * (1 + audioTreble * 0.5)",
-			uTime: "shaderTime",
-			uSeed: "shaderSeed + 345.0",
-		},
-	},
-};
-```
-
-## Available Audio Variables
-
-All audio variables are normalized to 0-1 range and can be used in uniform expressions:
-
-### Frequency Bands
-
-- `audioBass` - Bass frequencies (20-140 Hz) - kicks, bass
-- `audioMid` - Mid frequencies (140-2000 Hz) - vocals, guitars
-- `audioTreble` - Treble frequencies (2000-20000 Hz) - cymbals, hi-hats
-- `audioSubBass` - Sub-bass frequencies (20-60 Hz) - deep rumble
-- `audioLowMid` - Low-mid frequencies (250-500 Hz) - warmth
-- `audioHighMid` - High-mid frequencies (2000-4000 Hz) - presence
-- `audioPresence` - Presence frequencies (4000-6000 Hz) - clarity
-
-### Overall Metrics
-
-- `audioVolume` - Overall loudness (0-1)
-- `audioEnergy` - Energy level (volume squared for more dramatic response)
-- `audioBeat` - Beat detected this frame (0.0 or 1.0)
-- `audioBPM` - Detected BPM (number, e.g., 120)
-
-## Usage Patterns
-
-### Simple Multiplication
-
-Make any parameter pulse with audio:
-
-```javascript
-uAmount: "baseAmount * (1 + audioBass * 2)";
-// When audioBass = 0: uAmount = baseAmount * 1 = baseAmount
-// When audioBass = 1: uAmount = baseAmount * 3 = 3x stronger
-```
-
-### Adding/Offsetting
-
-Offset values based on audio:
-
-```javascript
-uAngle: "angle + audioMid * 3.14159";
-// Rotates up to 180 degrees based on mid frequencies
-```
-
-### Multiple Sources
-
-Combine different frequencies:
-
-```javascript
-uAmount: "baseAmount * (1 + audioBass * 0.5 + audioTreble * 0.3)";
-// Reacts to both bass and treble with different intensities
-```
-
-### Beat Triggers
-
-Use beat detection for discrete events:
-
-```javascript
-uFlash: "audioBeat * 0.5";
-// Sends 0.5 on beat, 0.0 otherwise
-```
-
-### Complex Expressions
-
-You can use any JavaScript math:
-
-```javascript
-uValue: "Math.sin(shaderTime + audioBass * 6.28) * audioEnergy";
-// Sine wave modulated by bass, scaled by energy
-```
-
-## Advanced: Direct Audio Access
-
-You can also access the audio analyzer directly in your sketch:
-
-```javascript
-function draw() {
-	// Get current audio values
-	let bass = audioAnalyzer.bass;
-	let beat = audioAnalyzer.beat();
-	let bpm = audioAnalyzer.getBPM();
-
-	// Get specific frequency range (in Hz)
-	let kickDrum = audioAnalyzer.getFrequency(40, 100);
-
-	// Get raw spectrum (array of 0-255 values)
-	let spectrum = audioAnalyzer.getSpectrum();
-
-	// Get waveform (array of -1 to 1 values)
-	let waveform = audioAnalyzer.getWaveform();
-
-	// Debug info
-	console.log(audioAnalyzer.getDebugInfo());
-}
-```
-
-## Performance Tips
-
-1. **Smoothing**: Higher smoothing (0.8-0.95) gives smoother visuals but slower response
-2. **FFT Bands**: Lower values (256-512) are faster but less detailed
-3. **Beat Threshold**: Adjust based on your audio source (quieter = lower threshold)
-4. **Combine Effects**: Mix time-based and audio-reactive animations for best results
-
-## Example: Full Audio-Reactive Configuration
-
-```javascript
-// In sketch.js setup():
-shaderEffects.enableAudio({
-    smoothing: 0.85,
-    beatThreshold: 0.12,
-    fftBands: 512
+audioAnalyzer.init("microphone", {
+	smoothing: 0.8,
+	beatThreshold: 0.15,
+	fftBands: 1024,
+	fftSmoothing: 0.8,
 });
+```
 
-// In sketch-shaders.js effectsConfig:
+## Make shaders audio-reactive
+
+### 1. Keep `effectsConfig` numeric
+
+Uniforms reference effect params (and `shaderTime` / `shaderSeed`) only:
+
+```javascript
+deform: {
+	enabled: true,
+	amount: 0.1,
+	octave: 4.0,
+	uniforms: {
+		uAmount: "amount",
+		uTime: "shaderTime",
+		uSeed: "shaderSeed",
+		uOctave: "octave",
+	},
+},
+
+chromatic: {
+	enabled: true,
+	amount: 0.0025,
+	uniforms: {
+		uAmount: "amount",
+		uTime: "shaderTime",
+		uSeed: "shaderSeed + 777.0",
+	},
+},
+
 pixelSort: {
-    enabled: true,
-    baseAngle: 0.0,
-    baseThreshold: 0.3,
-    uniforms: {
-        // Rotate continuously with time, modulated by mid frequencies
-        uAngle: "baseAngle + shaderTime * 0.1 + audioMid * 3.14",
-
-        // Threshold bounces with bass
-        uThreshold: "baseThreshold * (0.7 + audioBass * 0.5)",
-
-        // Sort amount follows overall energy
-        uSortAmount: "0.6 + audioEnergy * 0.4",
-
-        // Flash to full sort on beats
-        uSampleCount: "audioBeat > 0.5 ? 64.0 : 32.0",
-
-        uInvert: "0.0",
-        uSortMode: "1.0",
-        uTime: "shaderTime",
-        uSeed: "shaderSeed",
-        uResolution: "[width, height]",
-    },
+	enabled: true,
+	angle: 0.0,
+	threshold: 0.3,
+	sortAmount: 0.8,
+	uniforms: {
+		uAngle: "angle",
+		uThreshold: "threshold",
+		uSortAmount: "sortAmount",
+		uTime: "shaderTime",
+		uSeed: "shaderSeed + 999.0",
+		uResolution: "[width, height]",
+	},
 },
 ```
 
-## Browser Compatibility
+### 2. Update params every frame (before `apply`)
 
-- **Microphone access** requires HTTPS (or localhost for development)
-- User must grant microphone permission
-- Tested on: Chrome, Firefox, Safari, Edge
+Call this in your draw / render loop before `shaderEffects.apply()`:
+
+```javascript
+function updateAudioReactiveParams() {
+	if (!audioAnalyzer.isInitialized) return;
+
+	audioAnalyzer.update();
+
+	const bass = audioAnalyzer.bass;
+	const mid = audioAnalyzer.mid;
+	const treble = audioAnalyzer.treble;
+	const volume = audioAnalyzer.volume;
+	const energy = audioAnalyzer.energy;
+	const beat = audioAnalyzer.isBeat ? 1 : 0;
+	const bpm = audioAnalyzer.bpm || 120;
+	const t = shaderEffects.shaderTime || 0;
+
+	// 1. Simple audio pulse
+	shaderEffects.updateEffectParam("chromatic", "amount", 0.0025 * (1 + volume));
+
+	// 2. Bass-driven amount
+	shaderEffects.updateEffectParam("deform", "amount", 0.1 + bass * 0.4);
+
+	// 3. Multi-frequency response
+	shaderEffects.updateEffectParam("pixelSort", "angle", mid * Math.PI * 2);
+	shaderEffects.updateEffectParam("pixelSort", "sortAmount", 0.8 + treble * 0.5);
+
+	// 4. Beat-triggered flash
+	shaderEffects.updateEffectParam("chromatic", "amount", 0.0025 + beat * 0.02);
+
+	// 5. BPM-synced modulation
+	const phase = Math.sin(t * (bpm / 60) * Math.PI * 2);
+	shaderEffects.updateEffectParam("deform", "amount", 0.1 + phase * 0.05 * energy);
+
+	// 6. Spectrum bands → your own colour / custom params
+	// audioAnalyzer.subBass / .mid / .presence / .volume
+
+	// 7. Dynamic threshold
+	shaderEffects.updateEffectParam("pixelSort", "threshold", 0.5 - energy * 0.3);
+
+	// 8. Combination (time + audio)
+	shaderEffects.updateEffectParam("pixelSort", "angle", t * 0.5 + mid * Math.PI);
+	shaderEffects.updateEffectParam("deform", "amount", 0.1 + Math.sin(t) * 0.02 + bass * 0.3);
+
+	// Custom frequency range (kick)
+	const kick = audioAnalyzer.getFrequency(40, 100);
+	shaderEffects.updateEffectParam("deform", "amount", 0.1 + kick * 0.5);
+}
+```
+
+Pick the mappings you need — don’t call every line at once if they fight over the same param.
+
+## Available audio properties
+
+All band / level values are normalized **0–1**.
+
+### Frequency bands
+
+| Property | Typical use |
+| --- | --- |
+| `audioAnalyzer.bass` | kicks, bass |
+| `audioAnalyzer.mid` | vocals, guitars |
+| `audioAnalyzer.treble` | cymbals, hi-hats |
+| `audioAnalyzer.subBass` | 20–60 Hz deep rumble |
+| `audioAnalyzer.lowMid` | 250–500 Hz |
+| `audioAnalyzer.highMid` | 2000–4000 Hz |
+| `audioAnalyzer.presence` | 4000–6000 Hz |
+
+### Overall metrics
+
+| Property / method | Meaning |
+| --- | --- |
+| `audioAnalyzer.volume` | overall loudness |
+| `audioAnalyzer.energy` | volume² (more dramatic) |
+| `audioAnalyzer.isBeat` / `.beat()` | beat this frame |
+| `audioAnalyzer.bpm` / `.getBPM()` | detected BPM (~30–300) |
+
+### Helpers
+
+```javascript
+audioAnalyzer.getFrequency(40, 100); // custom Hz range → 0–1
+audioAnalyzer.getSpectrum();
+audioAnalyzer.getWaveform();
+audioAnalyzer.setSmoothing(0.9);
+audioAnalyzer.setBeatThreshold(0.1);
+audioAnalyzer.getDebugInfo();
+```
+
+## Tips
+
+1. Keep `effectsConfig` static; do audio math in the sketch
+2. Bass → big motion / scale; mid → colour / rotation; treble → grain / detail
+3. Scale gently (`* 0.3`) first; don’t map every param
+4. Smoothing 0.85–0.95 = fluid; 0.5–0.7 = snappy
+5. Use `isBeat` for discrete hits, `energy` for continuous response
+
+## Performance
+
+1. **Smoothing** — 0.8–0.95 fluid; 0.5–0.7 snappy
+2. **FFT bands** — 256–512 faster; 1024 more detail
+3. **Beat threshold** — lower for quiet sources
+4. Mix time-based motion with audio modulation
+
+## Browser notes
+
+- Microphone needs HTTPS (or localhost)
+- User must grant mic permission
 
 ## Troubleshooting
 
-**No audio detected:**
+**No audio**
 
-- Check browser console for errors
-- Ensure microphone permission is granted
-- Try a different browser
-- Make sure audio is playing/microphone is active
+- Scripts loaded? Console errors?
+- Mic permission granted?
+- For chime: press SPACE so notes play
 
-**Jerky visuals:**
+**Jerky visuals**
 
-- Increase smoothing: `shaderEffects.audioAnalyzer.setSmoothing(0.9)`
-- Lower FFT resolution
-- Add dampening: `audioBass * 0.3` instead of `audioBass`
+- `audioAnalyzer.setSmoothing(0.9)`
+- Dampen: `bass * 0.3` instead of raw `bass`
 
-**No beat detection:**
+**No beats**
 
-- Lower beat threshold: `shaderEffects.audioAnalyzer.setBeatThreshold(0.1)`
-- Check if music has strong transients (drums, percussion)
-- Try using `audioEnergy` instead for continuous response
+- `audioAnalyzer.setBeatThreshold(0.1)`
+- Prefer `energy` for continuous response if the track has weak transients
