@@ -98,8 +98,9 @@ if (navigator.requestMIDIAccess) {
 				if (controller === 37) {
 					const angle = map(value, 0, 127, 0.1, 5, true);
 					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-						console.log("translationSpeed", angle);
-						shaderEffects.updateEffectParam("symmetry", "translationSpeed", angle);
+						console.log("translationSpeedX/Y", angle);
+						shaderEffects.updateEffectParam("symmetry", "translationSpeedX", angle);
+						shaderEffects.updateEffectParam("symmetry", "translationSpeedY", angle);
 					}
 				}
 

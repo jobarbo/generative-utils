@@ -85,7 +85,8 @@ vec2 rotate(vec2 uv, float angle) {
 }
 
 void main() {
-	vec2 uv = vTexCoord;
+	// Match p5.js / pipeline UV (same flip as wave / pixelGrid)
+	vec2 uv = vec2(vTexCoord.x, 1.0 - vTexCoord.y);
 
 	// Add organic direction variation using noise
 	// This creates smooth, flowing direction changes across space and time

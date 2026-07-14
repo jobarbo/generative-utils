@@ -280,7 +280,12 @@ class AudioAnalyzer {
 		if (this._unlockBound) return;
 		this._unlockBound = true;
 
-		const unlock = () => {
+		const unlock = (e) => {
+			// Ignore UI overlays (debug / shader panels, controls) — only canvas/page unlocks mic
+			const t = e?.target;
+			if (t?.closest?.("#debug-panel, #shader-effects-panel, #controls, button, input, label, select, textarea")) {
+				return;
+			}
 			this.sourceError = null;
 			this._startMicrophone();
 		};

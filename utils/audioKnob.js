@@ -112,6 +112,11 @@ class AudioKnob {
 			return;
 		}
 
+		// Pause driving uniforms while the shader effects panel is open so sliders can stick
+		if (typeof shaderEffectsPanel !== "undefined" && shaderEffectsPanel.visible) {
+			return;
+		}
+
 		// Handle beat pulse (smooth decay for frame-based animation)
 		if (audioAnalyzer.isBeat) {
 			this.beatPulse = 1.0;

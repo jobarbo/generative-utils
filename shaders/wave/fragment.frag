@@ -7,39 +7,58 @@ uniform float uTime;
 uniform vec2 uResolution;
 uniform vec2 uCenter;
 
+// Personalization
+uniform float uAmount; // overall mix [0..1] — 0 = original, 1 = full effect
+uniform float uSpiralAmount; // spiral offset amplitude (legacy feel ≈ 1.0)
+uniform float uSpiralFrequency; // ring density along radius (legacy ≈ 12.0)
+uniform float uSpiralSpeed; // how fast spiral evolves with time (legacy ≈ 1.0)
+uniform float uFalloff; // radial falloff size [0.1..2] — smaller = tighter to center (legacy ≈ 1.414)
+uniform float uPulseAmount; // pulse modulation of spiral [0..] (legacy ≈ 0)
+uniform float uPulseSpeed; // pulse rate (legacy ≈ 1.7)
+uniform float uWaveAmount; // cartesian ripple amplitude (legacy ≈ 0.00001 — nearly off)
+uniform float uWaveFrequency; // cartesian ripple frequency (legacy ≈ 1.0)
+
 void main() {
-    // Flip the y coordinate to match p5js coordinate system
-    vec2 uv = vec2(vTexCoord.x, 1.0 - vTexCoord.y);
+	// Flip the y coordinate to match p5js coordinate system
+	vec2 uv = vec2(vTexCoord.x, 1.0 - vTexCoord.y);
+	vec2 originalUV = uv;
 
-    // Offset from configurable center (default 0.5, 0.5 = canvas center)
-    vec2 centered_uv = (uv - uCenter) * 2.0;
+	// Offset from configurable center (default 0.5, 0.5 = canvas center)
+	vec2 centered_uv = (uv - uCenter) * 2.0;
 
-    // Radial distance from center — smoothstep edges must be increasing (edge0 < edge1) or GLSL gives undefined / NaN → black frame.
-    float dist = length(centered_uv);
-    float centerWeight = 1.0 - smoothstep(0.0, 1.414, dist); // stronger toward center
+	// Radial distance from center — smoothstep edges must be increasing
+	float dist = length(centered_uv);
+	float falloffEnd = max(uFalloff, 0.001);
+	float centerWeight = 1.0 - smoothstep(0.0, falloffEnd, dist);
 
-    // Create pulsing effect
-    float pulse = sin(uTime * 1.7) * 0.000015 + 0.015;
+	float pulseSpeed = uPulseSpeed;
+	float pulse = sin(uTime * pulseSpeed) * uPulseAmount;
+	float pulseMul = 1.0 + pulse;
 
-    // More intense wave effect that changes over time
-/*     float waveX = tan(centered_uv.x * (20.0 + sin(uTime) * 0.00001)) * 0.000001 * centerWeight * (1.0 + pulse * 10.5);
-    float waveY = tan(centered_uv.y * (8.0 + cos(uTime * 0.000001) * 0.000001) + uTime) * 0.000001 * centerWeight * (1.0 + pulse * 10.5); */
+	// Soft cartesian ripple (legacy hardcodes were ~0 — bump waveAmount to bring it in)
+	float waveAmt = uWaveAmount * pulseMul;
+	float waveFreq = max(uWaveFrequency, 0.0);
+	float waveX = sin(centered_uv.x * waveFreq * 20.0 + uTime) * waveAmt * centerWeight;
+	float waveY = cos(centered_uv.y * waveFreq * 8.0 + uTime * 0.7) * waveAmt * centerWeight;
 
-    float waveX = centered_uv.x * 0.00001;
-    float waveY = centered_uv.y * 0.00001;
+	// Spiral — legacy look @ spiralAmount=1, spiralFrequency=12, spiralSpeed=1
+	float angle = atan(centered_uv.y, centered_uv.x);
+	float spiralFreq = uSpiralFrequency;
+	float spiralSpeed = uSpiralSpeed;
+	float spiral =
+		cos(dist * 1.1 * sin(uTime * 0.02 * spiralSpeed) * spiralFreq) +
+		sin(dist / 0.19 - uTime * 0.2 * spiralSpeed);
 
-    // Add spiral effect
-    float angle = atan(centered_uv.y, centered_uv.x);
-    float spiral = cos(dist * 1.1 * sin(uTime* 0.02) * 12.0) + sin(dist / 0.19 - uTime * 0.2);
+	vec2 waveOffset = vec2(waveX, waveY);
+	vec2 spiralOffset = vec2(cos(angle), sin(angle)) * spiral * centerWeight * uSpiralAmount * pulseMul;
 
-    vec2 waveOffset = vec2(waveX, waveY);
-    vec2 spiralOffset = vec2(cos(angle), sin(angle)) * spiral * centerWeight;
+	centered_uv += waveOffset + spiralOffset;
 
-    centered_uv += waveOffset + spiralOffset;
+	// Convert back to texture space
+	uv = clamp((centered_uv + 1.0) * 0.5, 0.0, 1.0);
 
-    // Convert back to texture space
-    uv = clamp((centered_uv + 1.0) * 0.5, 0.0, 1.0);
-
-    vec4 originalColor = texture2D(uTexture, uv);
-    gl_FragColor = originalColor;
+	vec4 warpedColor = texture2D(uTexture, uv);
+	vec4 originalColor = texture2D(uTexture, originalUV);
+	float blend = clamp(uAmount, 0.0, 1.0);
+	gl_FragColor = mix(originalColor, warpedColor, blend);
 }

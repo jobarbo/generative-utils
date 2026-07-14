@@ -68,7 +68,10 @@ class DebugPanel {
 					<span class="debug-panel__value" data-ref="fps">—</span>
 				</div>
 				<div class="debug-panel__row">
-					<span class="debug-panel__label">Loop</span>
+					<label class="debug-panel__loop-toggle">
+						<input type="checkbox" data-ref="loop-enabled" title="Enable master loop" />
+						<span class="debug-panel__label">Loop</span>
+					</label>
 					<span class="debug-panel__value" data-ref="loop">—</span>
 				</div>
 			</section>
@@ -112,6 +115,30 @@ class DebugPanel {
 
 		this.spectrumCanvas = this.refs.spectrum;
 		this.spectrumCtx = this.spectrumCanvas ? this.spectrumCanvas.getContext("2d") : null;
+
+		if (this.refs["loop-enabled"]) {
+			const loopInput = this.refs["loop-enabled"];
+			// Keep gestures on the control (don't fall through to canvas / mic unlock)
+			["pointerdown", "mousedown", "click", "touchstart"].forEach((ev) => {
+				loopInput.addEventListener(ev, (e) => e.stopPropagation());
+			});
+			loopInput.addEventListener("change", () => {
+				const shaders = this.shaderEffects;
+				if (!shaders || typeof shaders.setLoopConfig !== "function") return;
+				const on = loopInput.checked;
+				this._loopToggleBusy = true;
+				shaders.setLoopConfig({enabled: on});
+				console.log(`[debugPanel] loop ${on ? "ON" : "OFF"}`);
+				requestAnimationFrame(() => {
+					this._loopToggleBusy = false;
+				});
+			});
+			loopInput.addEventListener("keydown", (e) => e.stopPropagation());
+		}
+
+		panel.addEventListener("keydown", (e) => {
+			if (e.target?.tagName === "INPUT") e.stopPropagation();
+		});
 	}
 
 	_barHtml(id, label) {
@@ -181,8 +208,13 @@ class DebugPanel {
 			this.refs.fps.textContent = fps != null && fps > 0 ? `${fps} fps` : "—";
 		}
 
+		const loopOn = !!(shaders && shaders.loopConfig?.enabled);
+		if (this.refs["loop-enabled"] && !this._loopToggleBusy && document.activeElement !== this.refs["loop-enabled"]) {
+			this.refs["loop-enabled"].checked = loopOn;
+		}
+
 		if (this.refs.loop) {
-			if (!shaders || !shaders.loopConfig?.enabled) {
+			if (!shaders || !loopOn) {
 				this.refs.loop.textContent = "off";
 				this.refs.loop.classList.remove("is-warning");
 				return;

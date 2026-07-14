@@ -10,7 +10,10 @@ uniform float uSymmetryMode; // 0=horizontal, 1=vertical, 2=2-line, 3=4-line, 4=
 uniform float uAmount; // blend strength [0..1]
 uniform float uDebug; // 0.0 = normal, 1.0 = debug mode
 uniform float uTime; // time for animation
-uniform float uTranslationSpeed; // speed of horizontal/vertical movement
+uniform float uTranslationEnabled; // 0 = off, 1 = on
+uniform float uRotationEnabled; // 0 = off, 1 = on
+uniform float uTranslationSpeedX; // horizontal translation speed (0 = no X movement)
+uniform float uTranslationSpeedY; // vertical translation speed (0 = no Y movement)
 uniform float uTranslationPhaseX; // accumulated phase for X translation (prevents jumps)
 uniform float uTranslationPhaseY; // accumulated phase for Y translation (prevents jumps)
 uniform float uRotationSpeed; // speed of rotation
@@ -18,7 +21,7 @@ uniform float uRotationPhase; // accumulated phase for rotation (prevents jumps)
 uniform float uRotationAmplitude; // current rotation amplitude (maintains continuity when speed changes)
 uniform float uRotationOscillationSpeed; // speed of oscillation (controls how fast it alternates between positive/negative)
 uniform float uRotationStartingAngle; // starting angle for rotation (in radians, added to rotation)
-uniform float uTranslationMode; // 0=sine, 1=noise, 2=FBM, 3=vector field
+uniform float uTranslationMode; // 0=sine, 1=noise, 2=FBM, 3=vector field, 4=continuous scroll
 uniform float uRotationMode; // 0=cosine, 1=noise, 2=FBM
 uniform float uTranslationNoiseScale; // scale of noise variation (lower = smoother, higher = more frequent changes)
 uniform float uRotationNoiseScale; // scale of rotation noise (lower = smoother, higher = more frequent changes)
@@ -230,74 +233,64 @@ void main() {
 	// Translation: apply mode-based offset (affects entire canvas uniformly, no per-pixel deformation)
 	vec2 offset = vec2(0.0);
 
-	// Only apply translation if speed is non-zero
-	if (abs(uTranslationSpeed) > 0.001) {
-		float noiseTime = uTime * uTranslationNoiseScale; // Time for noise sampling (controls variation frequency)
+	if (uTranslationEnabled > 0.5 && (abs(uTranslationSpeedX) > 0.001 || abs(uTranslationSpeedY) > 0.001)) {
 		float moveAmount = 1.0; // Fixed amplitude - speed controls phase accumulation rate, not amplitude
 		int transMode = int(uTranslationMode);
 
 		if (transMode == 0) {
-			// Sine wave mode - use accumulated phase to prevent position jumps when speed changes
 			offset = vec2(
 				sin(uTranslationPhaseX) * 0.3,
 				cos(uTranslationPhaseY) * 0.3
 			);
 		} else if (transMode == 1) {
-			// Noise influences movement direction and speed (global, not per-pixel)
-			// Use phase to control sampling time, maintaining position continuity when speed changes
-			// Phase represents accumulated time offset, so we add it to noiseTime
 			float noiseX = noise(vec2(uTranslationPhaseX, 0.0)) * 2.0 - 1.0;
 			float noiseY = noise(vec2(uTranslationPhaseY, 100.0)) * 2.0 - 1.0;
 			offset = vec2(noiseX, noiseY) * moveAmount;
 		} else if (transMode == 2) {
-			// FBM influences movement (global, not per-pixel)
-			// Use phase to control sampling time, maintaining position continuity when speed changes
 			float fbmX = fbm(vec2(uTranslationPhaseX, 0.0), uTranslationPhaseX) * 2.0 - 1.0;
 			float fbmY = fbm(vec2(uTranslationPhaseY, 100.0), uTranslationPhaseY) * 2.0 - 1.0;
 			offset = vec2(fbmX, fbmY) * moveAmount;
 		} else if (transMode == 3) {
-			// Vector field at center influences movement (global, not per-pixel)
-			// Use phase to control sampling time, maintaining position continuity when speed changes
 			vec2 vf = vectorField(vec2(0.5), uTranslationPhaseX);
 			offset = vf * moveAmount;
+		} else if (transMode == 4) {
+			// Continuous scroll: phase advances one way; mirrorRepeat wraps UV so it loops
+			// seamlessly (no back-and-forth). Speed X/Y control scroll rate per axis.
+			offset = vec2(uTranslationPhaseX, uTranslationPhaseY);
 		} else {
-			// Default to sine - use accumulated phase to prevent position jumps when speed changes
 			offset = vec2(
 				sin(uTranslationPhaseX) * 0.3,
 				cos(uTranslationPhaseY) * 0.3
 			);
 		}
+
+		if (abs(uTranslationSpeedX) <= 0.001) offset.x = 0.0;
+		if (abs(uTranslationSpeedY) <= 0.001) offset.y = 0.0;
 	}
 
-	// Rotation: apply mode-based angle (affects entire canvas uniformly, no per-pixel deformation)
-	float rotationAngle;
-	float rotNoiseTime = uRotationPhase * uRotationNoiseScale; // Scale phase by noise scale for variation frequency
-	float rotateAmount = 1.0; // Fixed amplitude - speed controls phase accumulation rate, not amplitude
-	int rotMode = int(uRotationMode);
+	// Static base angle always applies (panel: rotation amount 0–360° → radians via uniform)
+	// Animated rotation is added only when uRotationEnabled is on
+	float rotationAngle = uRotationStartingAngle;
 
-	if (rotMode == 0) {
-		// Cosine oscillation mode - use accumulated phase to prevent angle jumps when speed changes
-		rotationAngle = uRotationPhase;
-	} else if (rotMode == 1) {
-		// Noise influences rotation (global, not per-pixel)
-		// Use scaled phase to control sampling time, maintaining angle continuity when speed changes
-		// rotationNoiseScale controls how fast the noise changes (lower = smoother, higher = more frequent)
-		// Use fixed amplitude - speed controls phase accumulation rate, not amplitude
-		float noiseRotation = noise(vec2(rotNoiseTime, 200.0)) * 2.0 - 1.0;
-		rotationAngle = noiseRotation * uRotationAmplitude;
-	} else if (rotMode == 2) {
-		// FBM influences rotation (global, not per-pixel)
-		// Use scaled phase to control sampling time, maintaining angle continuity when speed changes
-		// Use fixed amplitude - speed controls phase accumulation rate, not amplitude
-		float fbmRotation = fbm(vec2(rotNoiseTime, 200.0), rotNoiseTime) * 2.0 - 1.0;
-		rotationAngle = fbmRotation * uRotationAmplitude;
-	} else {
-		// Default to cosine - use accumulated phase to prevent angle jumps when speed changes
-		rotationAngle = uRotationPhase;
+	if (uRotationEnabled > 0.5) {
+		float rotNoiseTime = uRotationPhase * uRotationNoiseScale;
+		int rotMode = int(uRotationMode);
+		float animated = 0.0;
+
+		if (rotMode == 0) {
+			animated = uRotationPhase;
+		} else if (rotMode == 1) {
+			float noiseRotation = noise(vec2(rotNoiseTime, 200.0)) * 2.0 - 1.0;
+			animated = noiseRotation * uRotationAmplitude;
+		} else if (rotMode == 2) {
+			float fbmRotation = fbm(vec2(rotNoiseTime, 200.0), rotNoiseTime) * 2.0 - 1.0;
+			animated = fbmRotation * uRotationAmplitude;
+		} else {
+			animated = uRotationPhase;
+		}
+
+		rotationAngle += animated;
 	}
-
-	// Add starting angle to the rotation
-	rotationAngle += uRotationStartingAngle;
 
 	float cosAngle = cos(rotationAngle);
 	float sinAngle = sin(rotationAngle);
@@ -355,28 +348,21 @@ void main() {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 4) {
-			// Horizontal, vertical, and two diagonal lines (8-fold)
-			if (abs(uv.y - uCenter.y) < lineThickness || abs(uv.x - uCenter.x) < lineThickness ||
-				abs(uv.x - uv.y) < lineThickness || abs(uv.x + uv.y - 1.0) < lineThickness) {
+			// Horizontal, vertical, and two diagonals through uCenter (8-fold)
+			vec2 d4 = uv - uCenter;
+			if (abs(d4.y) < lineThickness || abs(d4.x) < lineThickness ||
+				abs(d4.x - d4.y) < lineThickness || abs(d4.x + d4.y) < lineThickness) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 5) {
-			// Horizontal, vertical, diagonal lines, and lines at 22.5/67.5 degrees (16-fold)
-			// Get offset from center
-			vec2 offset = uv - vec2(0.5);
-			vec2 absOffset = abs(offset);
-			float angle = atan(absOffset.y, absOffset.x);
-			float radius = length(offset);
+			// H/V, 45° diagonals, and 22.5°/67.5° lines — all relative to uCenter (16-fold)
+			vec2 d5 = uv - uCenter;
+			vec2 absOffset = abs(d5);
 
-			// Center cross lines (horizontal and vertical)
-			bool centerCross = abs(uv.y - uCenter.y) < lineThickness || abs(uv.x - uCenter.x) < lineThickness;
+			bool centerCross = abs(d5.y) < lineThickness || abs(d5.x) < lineThickness;
+			bool diagonals = abs(d5.x - d5.y) < lineThickness || abs(d5.x + d5.y) < lineThickness;
 
-			// Diagonal lines at 45 degrees (from 8-fold)
-			bool diagonals = abs(uv.x - uv.y) < lineThickness || abs(uv.x + uv.y - 1.0) < lineThickness;
-
-			// Lines at 22.5 and 67.5 degrees (for 16-fold)
-			float tan22_5 = 0.41421356;
-			float tan67_5 = 2.41421356;
+			float tan22_5 = 0.41421356; // tan(22.5°)
 			bool lines22_5 = abs(absOffset.y - absOffset.x * tan22_5) < lineThickness * 0.5;
 			bool lines67_5 = abs(absOffset.x - absOffset.y * tan22_5) < lineThickness * 0.5;
 

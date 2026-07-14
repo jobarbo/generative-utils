@@ -15,6 +15,7 @@ class ShaderManager {
 			width: 1,
 			height: 1,
 		};
+		this.crispPixels = true; // NEAREST sampling in shader passes
 	}
 
 	/**
@@ -126,9 +127,38 @@ class ShaderManager {
 		// Set uniforms
 		for (const [key, value] of Object.entries(uniforms)) {
 			shader.setUniform(key, value);
+			// After binding a sampler, force nearest filtering for crisp low-res look
+			if (this.crispPixels && this._looksLikeTexture(value)) {
+				this._forceNearestSampling(ctx);
+			}
 		}
 
 		return this;
+	}
+
+	_looksLikeTexture(value) {
+		if (!value || typeof value !== "object") return false;
+		return (
+			typeof value.width === "number" ||
+			value instanceof HTMLCanvasElement ||
+			value.rawTexture ||
+			value.texture ||
+			typeof value.begin === "function"
+		);
+	}
+
+	/**
+	 * Use NEAREST mag/min filter on the currently bound 2D texture.
+	 */
+	_forceNearestSampling(ctx) {
+		const gl = ctx?.drawingContext || ctx?._renderer?.GL || ctx?._renderer?.gl;
+		if (!gl || typeof gl.texParameteri !== "function") return;
+		try {
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		} catch (_) {
+			/* ignore */
+		}
 	}
 
 	/**

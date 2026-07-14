@@ -19,6 +19,7 @@ class ShaderEffectsPanel {
 		this.drawers = new Map(); // effectName -> { root, body, toggle, inputs }
 		this._editing = false; // pause external value sync while dragging sliders
 		this._dragName = null;
+		this._sizeDirty = false; // user edited size fields — don't overwrite until Apply
 	}
 
 	/**
@@ -78,6 +79,40 @@ class ShaderEffectsPanel {
 				<span class="shader-effects-panel__title">Shaders</span>
 				<span class="shader-effects-panel__hint">E · drag ⠿</span>
 			</div>
+			<section class="shader-effects-panel__output" data-ref="output">
+				<div class="shader-effects-panel__output-title">Output</div>
+				<label class="shader-effects-panel__control shader-effects-panel__control--bool">
+					<input type="checkbox" class="shader-effects-panel__bool" data-ref="fit-canvas" title="Map full texture (no crop)" />
+					<span class="shader-effects-panel__bool-label">fit canvas (no crop)</span>
+				</label>
+				<label class="shader-effects-panel__control shader-effects-panel__control--bool">
+					<input type="checkbox" class="shader-effects-panel__bool" data-ref="crisp" title="Nearest filtering — sharp colors when upscaled" checked />
+					<span class="shader-effects-panel__bool-label">crisp pixels (no blur)</span>
+				</label>
+				<div class="shader-effects-panel__output-row">
+					<span class="shader-effects-panel__output-label">ratio</span>
+					<input type="number" class="shader-effects-panel__number" data-ref="ratio-w" min="0.01" step="0.01" title="Crop aspect width" />
+					<span class="shader-effects-panel__output-sep">:</span>
+					<input type="number" class="shader-effects-panel__number" data-ref="ratio-h" min="0.01" step="0.01" title="Crop aspect height" />
+					<select class="shader-effects-panel__preset" data-ref="ratio-preset" title="Ratio presets">
+						<option value="">custom</option>
+						<option value="1:1">1:1</option>
+						<option value="16:9">16:9</option>
+						<option value="9:16">9:16</option>
+						<option value="4:3">4:3</option>
+						<option value="3:4">3:4</option>
+						<option value="21:9">21:9</option>
+						<option value="10:1">10:1</option>
+					</select>
+				</div>
+				<div class="shader-effects-panel__output-row">
+					<span class="shader-effects-panel__output-label">size</span>
+					<input type="number" class="shader-effects-panel__number" data-ref="size-w" min="16" step="1" title="Canvas width" />
+					<span class="shader-effects-panel__output-sep">×</span>
+					<input type="number" class="shader-effects-panel__number" data-ref="size-h" min="16" step="1" title="Canvas height" />
+					<button type="button" class="shader-effects-panel__apply" data-ref="size-apply" title="Apply canvas resolution">ok</button>
+				</div>
+			</section>
 			<div class="shader-effects-panel__list" data-ref="list"></div>
 			<div class="shader-effects-panel__footer" data-ref="footer">
 				<select class="shader-effects-panel__template" data-ref="template" title="Effect type"></select>
@@ -90,10 +125,184 @@ class ShaderEffectsPanel {
 		this.listEl = panel.querySelector("[data-ref='list']");
 		this.templateSelect = panel.querySelector("[data-ref='template']");
 		this.addBtn = panel.querySelector("[data-ref='add']");
+		this.outputRefs = {
+			fit: panel.querySelector("[data-ref='fit-canvas']"),
+			crisp: panel.querySelector("[data-ref='crisp']"),
+			ratioW: panel.querySelector("[data-ref='ratio-w']"),
+			ratioH: panel.querySelector("[data-ref='ratio-h']"),
+			preset: panel.querySelector("[data-ref='ratio-preset']"),
+			sizeW: panel.querySelector("[data-ref='size-w']"),
+			sizeH: panel.querySelector("[data-ref='size-h']"),
+			apply: panel.querySelector("[data-ref='size-apply']"),
+		};
 
 		panel.addEventListener("keydown", (e) => e.stopPropagation());
 		this._bindListDnD();
 		this._bindAddFooter();
+		this._bindOutputControls();
+		this._syncOutputControls();
+	}
+
+	_bindOutputControls() {
+		const r = this.outputRefs;
+		if (!r?.fit || r.fit.dataset.bound) return;
+		r.fit.dataset.bound = "1";
+
+		const stop = (e) => e.stopPropagation();
+		["pointerdown", "mousedown", "click", "keydown"].forEach((ev) => {
+			r.fit.addEventListener(ev, stop);
+			if (r.crisp) r.crisp.addEventListener(ev, stop);
+			r.ratioW.addEventListener(ev, stop);
+			r.ratioH.addEventListener(ev, stop);
+			r.preset.addEventListener(ev, stop);
+			r.sizeW.addEventListener(ev, stop);
+			r.sizeH.addEventListener(ev, stop);
+			r.apply.addEventListener(ev, stop);
+		});
+
+		const commitRatio = () => {
+			if (!this.shaderEffects?.setRenderRatio) return;
+			const w = Math.max(parseFloat(r.ratioW.value) || 1, 0.01);
+			const h = Math.max(parseFloat(r.ratioH.value) || 1, 0.01);
+			this.shaderEffects.setRenderRatio({
+				fitCanvas: r.fit.checked,
+				width: w,
+				height: h,
+			});
+			this._updateRatioPresetMatch();
+			this._setRatioFieldsEnabled(!r.fit.checked);
+		};
+
+		r.fit.addEventListener("change", commitRatio);
+		if (r.crisp) {
+			r.crisp.addEventListener("change", () => {
+				if (typeof this.shaderEffects?.setCrispPixels === "function") {
+					this.shaderEffects.setCrispPixels(r.crisp.checked);
+				}
+			});
+		}
+		r.ratioW.addEventListener("change", commitRatio);
+		r.ratioH.addEventListener("change", commitRatio);
+		r.ratioW.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") commitRatio();
+		});
+		r.ratioH.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") commitRatio();
+		});
+
+		r.preset.addEventListener("change", () => {
+			const val = r.preset.value;
+			if (!val) return;
+			const [w, h] = val.split(":").map(Number);
+			if (!w || !h) return;
+			r.ratioW.value = String(w);
+			r.ratioH.value = String(h);
+			r.fit.checked = false;
+			commitRatio();
+		});
+
+		const markSizeDirty = () => {
+			this._sizeDirty = true;
+		};
+		r.sizeW.addEventListener("input", markSizeDirty);
+		r.sizeH.addEventListener("input", markSizeDirty);
+
+		const applySize = () => {
+			if (!this.shaderEffects?.resize || this._applyingSize) return;
+			const w = parseFloat(r.sizeW.value);
+			const h = parseFloat(r.sizeH.value);
+			if (!Number.isFinite(w) || !Number.isFinite(h) || w < 16 || h < 16) {
+				console.warn("[shaderEffectsPanel] invalid size — need both W and H ≥ 16");
+				return;
+			}
+
+			this._applyingSize = true;
+			this._editing = true;
+			this._sizeDirty = false;
+			try {
+				this.shaderEffects.resize(w, h);
+				const size = this.shaderEffects.getCanvasSize?.() || {width: w, height: h};
+				r.sizeW.value = String(Math.round(size.width || w));
+				r.sizeH.value = String(Math.round(size.height || h));
+			} finally {
+				// Delay unlock so blur/click can't double-fire in the same gesture
+				requestAnimationFrame(() => {
+					this._editing = false;
+					this._applyingSize = false;
+				});
+			}
+		};
+
+		// pointerdown reads values before focus moves — one apply, no blur race
+		r.apply.addEventListener("pointerdown", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			applySize();
+		});
+		r.apply.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+		});
+		r.sizeW.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
+				e.preventDefault();
+				applySize();
+			}
+		});
+		r.sizeH.addEventListener("keydown", (e) => {
+			if (e.key === "Enter") {
+				e.preventDefault();
+				applySize();
+			}
+		});
+	}
+
+	_setRatioFieldsEnabled(enabled) {
+		const r = this.outputRefs;
+		if (!r) return;
+		r.ratioW.disabled = !enabled;
+		r.ratioH.disabled = !enabled;
+		r.preset.disabled = !enabled;
+	}
+
+	_updateRatioPresetMatch() {
+		const r = this.outputRefs;
+		if (!r?.preset) return;
+		const w = parseFloat(r.ratioW.value);
+		const h = parseFloat(r.ratioH.value);
+		let match = "";
+		for (const opt of r.preset.options) {
+			if (!opt.value) continue;
+			const [pw, ph] = opt.value.split(":").map(Number);
+			if (Math.abs(w / h - pw / ph) < 0.001) {
+				match = opt.value;
+				break;
+			}
+		}
+		r.preset.value = match;
+	}
+
+	_syncOutputControls() {
+		const r = this.outputRefs;
+		const se = this.shaderEffects;
+		if (!r || !se) return;
+
+		const ratio = typeof se.getRenderRatio === "function" ? se.getRenderRatio() : se.renderRatio || {};
+		if (document.activeElement !== r.fit) r.fit.checked = !!ratio.fitCanvas;
+		if (r.crisp && document.activeElement !== r.crisp) {
+			r.crisp.checked = typeof se.getCrispPixels === "function" ? se.getCrispPixels() : !!se.crispPixels;
+		}
+		if (document.activeElement !== r.ratioW) r.ratioW.value = String(ratio.width ?? 1);
+		if (document.activeElement !== r.ratioH) r.ratioH.value = String(ratio.height ?? 1);
+		this._setRatioFieldsEnabled(!ratio.fitCanvas);
+		this._updateRatioPresetMatch();
+
+		// Don't clobber in-progress size edits (otherwise Apply reads reset values)
+		if (this._sizeDirty) return;
+
+		const size = typeof se.getCanvasSize === "function" ? se.getCanvasSize() : {width: 0, height: 0};
+		if (document.activeElement !== r.sizeW && size.width) r.sizeW.value = String(Math.round(size.width));
+		if (document.activeElement !== r.sizeH && size.height) r.sizeH.value = String(Math.round(size.height));
 	}
 
 	_bindAddFooter() {
@@ -108,10 +317,7 @@ class ShaderEffectsPanel {
 
 	_fillTemplateSelect() {
 		if (!this.templateSelect || !this.shaderEffects) return;
-		const names =
-			typeof this.shaderEffects.getEffectTemplateNames === "function"
-				? this.shaderEffects.getEffectTemplateNames()
-				: Object.keys(this.shaderEffects.effectTemplates || {}).sort();
+		const names = typeof this.shaderEffects.getEffectTemplateNames === "function" ? this.shaderEffects.getEffectTemplateNames() : Object.keys(this.shaderEffects.effectTemplates || {}).sort();
 		const prev = this.templateSelect.value;
 		this.templateSelect.innerHTML = "";
 		for (const name of names) {
@@ -290,7 +496,7 @@ class ShaderEffectsPanel {
 					inputs.set(`${key}.${idx}`, control);
 				});
 			} else if (typeof value === "number") {
-				const control = this._createNumberControl(effectName, key, value, null, 1);
+				const control = this._isBoolParam(key) ? this._createBoolControl(effectName, key, value) : this._createNumberControl(effectName, key, value, null, 1);
 				body.appendChild(control.root);
 				inputs.set(key, control);
 			}
@@ -352,9 +558,7 @@ class ShaderEffectsPanel {
 	}
 
 	_openDrawerNames() {
-		return new Set(
-			[...this.listEl.querySelectorAll(".shader-effects-panel__drawer[open]")].map((el) => el.dataset.effect),
-		);
+		return new Set([...this.listEl.querySelectorAll(".shader-effects-panel__drawer[open]")].map((el) => el.dataset.effect));
 	}
 
 	_restoreOpenDrawers(openNames, focusName = null) {
@@ -376,6 +580,8 @@ class ShaderEffectsPanel {
 		for (const [key, value] of Object.entries(effect)) {
 			if (key === "enabled" || key === "uniforms" || key === "pass") continue;
 			if (key.startsWith("_")) continue; // internal snapshots
+			// Accumulated phases — driven by speed, not hand-edited
+			if (key === "translationPhaseX" || key === "translationPhaseY" || key === "rotationPhase") continue;
 			if (typeof value === "number") out.push({key, value});
 			else if (Array.isArray(value) && value.length && value.every((v) => typeof v === "number")) {
 				out.push({key, value});
@@ -384,48 +590,157 @@ class ShaderEffectsPanel {
 		return out;
 	}
 
+	_isBoolParam(key) {
+		const k = String(key).toLowerCase();
+		return (
+			k === "debug" ||
+			k === "translationenabled" ||
+			k === "rotationenabled" ||
+			k === "animatezoom" ||
+			k === "aspectcorrect" ||
+			k === "blurcrt" ||
+			k.includes("invert") ||
+			(k.includes("animate") && !k.includes("amount"))
+		);
+	}
+
+	/**
+	 * Exact per-param limits (modes, ints, known 0–1 caps).
+	 * Checked before heuristics so enums never get a generic 0–8.
+	 */
+	_paramLimits(key) {
+		const k = String(key).toLowerCase();
+
+		/** @type {Record<string, {min:number,max:number,step:number,integer?:boolean}>} */
+		const exact = {
+			// —— Modes / enums ——
+			symmetrymode: {min: 0, max: 6, step: 1, integer: true}, // H V 2 4 8 16 radial
+			translationmode: {min: 0, max: 4, step: 1, integer: true}, // sine noise FBM vf scroll
+			rotationmode: {min: 0, max: 2, step: 1, integer: true}, // cos noise FBM
+			sortmode: {min: 1, max: 4, step: 1, integer: true}, // sine noise FBM vf
+			gridmode: {min: 0, max: 1, step: 1, integer: true}, // pixel / diffuse
+			dithermode: {min: 0, max: 4, step: 1, integer: true}, // bayer4/8 hash line cluster
+			colormode: {min: 0, max: 1, step: 1, integer: true}, // luma / per-channel
+			easingmode: {min: 0, max: 5, step: 1, integer: true}, // sine…bounce
+			outofboundsmode: {min: 0, max: 3, step: 1, integer: true}, // black clamp mirror alpha
+			blurmode: {min: 0, max: 2, step: 1, integer: true}, // gaussian radial directional
+			filtermode: {min: 0, max: 1, step: 1, integer: true}, // true pixel / filter overlay
+
+			// —— Discrete counts ——
+			samplecount: {min: 1, max: 64, step: 1, integer: true},
+			levels: {min: 2, max: 256, step: 1, integer: true},
+			octave: {min: 1, max: 36, step: 1, integer: true},
+			blurquality: {min: 1, max: 128, step: 1, integer: true},
+
+			// —— Degrees / angles ——
+			rotationstartingangle: {min: 0, max: 360, step: 0.1},
+			angle: {min: 0, max: Math.PI * 2, step: 0.01},
+			blurdirection: {min: 0, max: Math.PI * 2, step: 0.01},
+
+			// —— Known units ——
+			gridsize: {min: 1, max: 1440, step: 1, integer: true},
+			sortamount: {min: 0, max: 120, step: 0.1},
+			translationspeedx: {min: 0, max: 5, step: 0.01},
+			translationspeedy: {min: 0, max: 5, step: 0.01},
+			spiralamount: {min: 0, max: 3, step: 0.01},
+			spiralfrequency: {min: 0, max: 48, step: 0.1},
+			spiralspeed: {min: 0, max: 5, step: 0.01},
+			pulsespeed: {min: 0, max: 5, step: 0.01},
+			pulseamount: {min: 0, max: 1, step: 0.01},
+			falloff: {min: 0.1, max: 2.5, step: 0.01},
+			waveamount: {min: 0, max: 0.15, step: 0.001},
+			wavefrequency: {min: 0, max: 8, step: 0.01},
+			cellratio: {min: 0, max: 4, step: 0.01},
+			mix: {min: 0, max: 1, step: 0.001}, // shader clamp
+			blurstart: {min: 0, max: 1, step: 0.01},
+			blurmin: {min: 0, max: 1, step: 0.01},
+			blurcrtpower: {min: 1, max: 64, step: 0.1},
+			gapbrightness: {min: 0, max: 1, step: 0.01},
+		};
+
+		if (exact[k]) {
+			const r = exact[k];
+			return {min: r.min, max: r.max, step: r.step, integer: !!r.integer};
+		}
+		return null;
+	}
+
 	_guessRange(key, value) {
 		const k = key.toLowerCase();
 		const v = Math.abs(Number(value)) || 0;
 
-		// Discrete integers — typed entry allowed but snaps to int + clamped range
-		if (k.includes("mode")) return {min: 0, max: 8, step: 1, integer: true};
-		if (k.includes("levels")) return {min: 1, max: 32, step: 1, integer: true};
-		if (k.includes("sample")) return {min: 1, max: 64, step: 1, integer: true};
-		if (k === "debug" || k.includes("invert") || k.includes("animate")) {
+		const exact = this._paramLimits(key);
+		if (exact) return exact;
+
+		if (this._isBoolParam(key)) {
 			return {min: 0, max: 1, step: 1, integer: true};
 		}
-		if (k.includes("filtermode") || k.includes("colormode") || k.includes("gridmode") || k.includes("sortmode")) {
+
+		// Remaining *Mode enums (keep tight if name ends with Mode)
+		if (k.endsWith("mode")) {
 			return {min: 0, max: 8, step: 1, integer: true};
 		}
 
+		// 0–1 normalized / blend-style (exclude amplified *Amount params)
+		const amplifiedAmount = k.includes("zoom") || k.includes("sort") || k.includes("blur") || k.includes("spiral") || k.includes("wave") || k.includes("pulse") || k === "warpamount";
 		if (
-			k.includes("amount") ||
-			k.includes("threshold") ||
-			k.includes("ratio") ||
-			k.includes("opacity") ||
-			k.includes("mix") ||
-			k.includes("diffuse") ||
-			k.includes("strength") ||
-			k.includes("falloff") ||
-			k.includes("center") ||
-			(k.includes("gap") && v <= 1)
+			!amplifiedAmount &&
+			(k === "amount" ||
+				k.endsWith("amount") ||
+				k.includes("threshold") ||
+				k.includes("opacity") ||
+				k.includes("diffuse") ||
+				k.includes("strength") ||
+				k.includes("center") ||
+				k.includes("vignette") ||
+				k.includes("inset") ||
+				k.includes("smooth") ||
+				(k.includes("gap") && v <= 1))
 		) {
+			// Tiny chromatic-style amounts get a finer range
+			if (k === "amount" && v > 0 && v < 0.05) {
+				return {min: 0, max: 0.05, step: 0.0001, integer: false};
+			}
 			return {min: 0, max: 1, step: 0.001, integer: false};
 		}
 
-		if (k.includes("angle")) return {min: 0, max: Math.PI * 2, step: 0.01, integer: false};
-		if (k.includes("octave")) return {min: 1, max: 8, step: 0.1, integer: false};
-		if (k.includes("multiplier") || k.includes("speed")) {
+		if (k.includes("ratio") && k !== "cellratio") {
+			return {min: 0, max: 1, step: 0.001, integer: false};
+		}
+
+		if (k.includes("angle") || k.includes("direction")) {
+			return {min: 0, max: Math.PI * 2, step: 0.01, integer: false};
+		}
+
+		if (k.includes("multiplier") || (k.includes("speed") && !k.includes("line"))) {
 			return {min: 0, max: Math.max(5, v * 3 || 5), step: 0.01, integer: false};
 		}
+
+		if (k.includes("zoom")) {
+			return {min: 0, max: Math.max(8, v * 2 || 8), step: 0.01, integer: false};
+		}
+
+		if (k === "warpamount" || k.includes("intensity") || k.includes("density")) {
+			return {min: 0, max: Math.max(1, v * 2 || 1), step: v > 10 ? 0.1 : 0.01, integer: false};
+		}
+
 		if (k.includes("brightness") || k.includes("gain") || k.includes("scale")) {
 			return {min: 0, max: Math.max(2, v * 2 || 2), step: 0.01, integer: false};
 		}
+
+		if (k.includes("bluramount") || (k.includes("blur") && k.includes("amount"))) {
+			return {min: 0, max: Math.max(64, v * 2 || 64), step: 0.1, integer: false};
+		}
+
 		if (k.includes("size") || k.includes("tile") || k.includes("grid") || k.includes("cell") || k.includes("radius")) {
 			return {min: 0, max: Math.max(64, v * 2 || 64), step: v >= 10 ? 1 : 0.1, integer: v >= 10};
 		}
-		if (k.includes("phase") || k.includes("amplitude")) {
+
+		if (k.includes("amplitude")) {
+			return {min: 0, max: Math.max(100, v * 2 || 100), step: 0.1, integer: false};
+		}
+
+		if (k.includes("phase")) {
 			return {min: -Math.max(10, v * 2), max: Math.max(10, v * 2), step: 0.01, integer: false};
 		}
 
@@ -433,9 +748,98 @@ class ShaderEffectsPanel {
 		return {min: Math.min(0, -max * 0.25), max, step: max > 10 ? 0.1 : 0.01, integer: false};
 	}
 
+	_createBoolControl(effectName, key, value) {
+		const root = document.createElement("label");
+		root.className = "shader-effects-panel__control shader-effects-panel__control--bool";
+
+		const checkbox = document.createElement("input");
+		checkbox.type = "checkbox";
+		checkbox.className = "shader-effects-panel__bool";
+		checkbox.checked = Number(value) > 0.5;
+		const boolLabels = {
+			debug: "debug (guides)",
+			translationEnabled: "translation",
+			rotationEnabled: "rotation",
+			animateZoom: "animate zoom",
+			aspectCorrect: "aspect correct",
+			blurCrt: "blur CRT shape",
+			invert: "invert",
+		};
+		checkbox.title = boolLabels[key] ? `Toggle ${boolLabels[key]}` : `Toggle ${key}`;
+
+		const nameEl = document.createElement("span");
+		nameEl.className = "shader-effects-panel__bool-label";
+		nameEl.textContent = boolLabels[key] || key;
+
+		checkbox.addEventListener("change", () => {
+			this._applyParam(effectName, key, checkbox.checked ? 1 : 0, null, 1);
+		});
+
+		root.appendChild(checkbox);
+		root.appendChild(nameEl);
+
+		return {root, input: checkbox, key, componentIndex: null, bool: true};
+	}
+
+	_paramLabel(key, componentIndex, componentCount) {
+		const k = String(key).toLowerCase();
+		const labels = {
+			translationspeedx: "translation speed X",
+			translationspeedy: "translation speed Y",
+			translationmode: "translation mode (0–4)",
+			symmetrymode: "symmetry mode (0–6)",
+			rotationmode: "rotation mode (0–2)",
+			rotationstartingangle: "rotation amount (°)",
+			spiralamount: "spiral amount",
+			spiralfrequency: "spiral frequency",
+			spiralspeed: "spiral speed",
+			pulseamount: "pulse amount",
+			pulsespeed: "pulse speed",
+			waveamount: "wave amount",
+			wavefrequency: "wave frequency",
+			sortamount: "sort amount",
+			sortmode: "sort mode (1–4)",
+			samplecount: "sample count",
+			gridmode: "grid mode (0 pixel / 1 diffuse)",
+			dithermode: "dither mode (0–4)",
+			colormode: "color mode (0–1)",
+			easingmode: "easing mode (0–5)",
+			outofboundsmode: "bounds mode (0–3)",
+			blurmode: "blur mode (0–2)",
+			filtermode: "filter mode (0–1)",
+			blurquality: "blur quality",
+			blurdirection: "blur direction",
+			levels: "levels (2–256)",
+		};
+		if (labels[k]) return labels[k];
+
+		if (componentIndex == null) return key;
+
+		const axis2 = ["X", "Y"];
+		const axis3 = ["X", "Y", "Z"];
+		const axis4 = ["X", "Y", "Z", "W"];
+		const rgb = ["R", "G", "B"];
+		const rgba = ["R", "G", "B", "A"];
+
+		if (k === "gridsize" && componentCount === 2) {
+			return `pixel ${axis2[componentIndex] || componentIndex}`;
+		}
+		if ((k === "center" || k.includes("center") || k.includes("offset") || k.includes("position") || k.includes("origin")) && componentCount === 2) {
+			return `${key} ${axis2[componentIndex] || componentIndex}`;
+		}
+		if (k.includes("color") || k.includes("rgb")) {
+			const labels = componentCount === 4 ? rgba : rgb;
+			if (componentIndex < labels.length) return `${key} ${labels[componentIndex]}`;
+		}
+		if (componentCount === 2) return `${key} ${axis2[componentIndex] || `[${componentIndex}]`}`;
+		if (componentCount === 3) return `${key} ${axis3[componentIndex] || `[${componentIndex}]`}`;
+		if (componentCount === 4) return `${key} ${axis4[componentIndex] || `[${componentIndex}]`}`;
+		return `${key}[${componentIndex}]`;
+	}
+
 	_createNumberControl(effectName, key, value, componentIndex, componentCount) {
 		const range = this._guessRange(key, value);
-		const labelText = componentIndex == null ? key : `${key}[${componentIndex}]`;
+		const labelText = this._paramLabel(key, componentIndex, componentCount);
 
 		const root = document.createElement("div");
 		root.className = "shader-effects-panel__control";
@@ -590,6 +994,11 @@ class ShaderEffectsPanel {
 				}
 				if (typeof value !== "number") continue;
 
+				if (control.bool) {
+					control.input.checked = value > 0.5;
+					continue;
+				}
+
 				const min = parseFloat(control.input.min);
 				const max = parseFloat(control.input.max);
 				if (!control.integer) {
@@ -607,6 +1016,8 @@ class ShaderEffectsPanel {
 				if (control.numberInput) control.numberInput.value = this._formatValue(value);
 			}
 		}
+
+		this._syncOutputControls();
 	}
 
 	update() {
