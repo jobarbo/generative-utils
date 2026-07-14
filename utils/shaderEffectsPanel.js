@@ -79,14 +79,50 @@ class ShaderEffectsPanel {
 				<span class="shader-effects-panel__hint">E · drag ⠿</span>
 			</div>
 			<div class="shader-effects-panel__list" data-ref="list"></div>
+			<div class="shader-effects-panel__footer" data-ref="footer">
+				<select class="shader-effects-panel__template" data-ref="template" title="Effect type"></select>
+				<button type="button" class="shader-effects-panel__add" data-ref="add" title="Add effect">+</button>
+			</div>
 		`;
 
 		document.body.appendChild(panel);
 		this.el = panel;
 		this.listEl = panel.querySelector("[data-ref='list']");
+		this.templateSelect = panel.querySelector("[data-ref='template']");
+		this.addBtn = panel.querySelector("[data-ref='add']");
 
 		panel.addEventListener("keydown", (e) => e.stopPropagation());
 		this._bindListDnD();
+		this._bindAddFooter();
+	}
+
+	_bindAddFooter() {
+		if (!this.addBtn || this.addBtn.dataset.bound) return;
+		this.addBtn.dataset.bound = "1";
+		this.addBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			const type = this.templateSelect?.value;
+			if (type) this._createEffect(type);
+		});
+	}
+
+	_fillTemplateSelect() {
+		if (!this.templateSelect || !this.shaderEffects) return;
+		const names =
+			typeof this.shaderEffects.getEffectTemplateNames === "function"
+				? this.shaderEffects.getEffectTemplateNames()
+				: Object.keys(this.shaderEffects.effectTemplates || {}).sort();
+		const prev = this.templateSelect.value;
+		this.templateSelect.innerHTML = "";
+		for (const name of names) {
+			const opt = document.createElement("option");
+			opt.value = name;
+			opt.textContent = name;
+			this.templateSelect.appendChild(opt);
+		}
+		if (prev && names.includes(prev)) this.templateSelect.value = prev;
+		this.templateSelect.disabled = !names.length;
+		if (this.addBtn) this.addBtn.disabled = !names.length;
 	}
 
 	_bindListDnD() {
@@ -160,6 +196,7 @@ class ShaderEffectsPanel {
 		for (const effectName of Object.keys(config)) {
 			this.listEl.appendChild(this._createDrawer(effectName, config[effectName]));
 		}
+		this._fillTemplateSelect();
 	}
 
 	_createDrawer(effectName, effect) {
@@ -211,9 +248,33 @@ class ShaderEffectsPanel {
 		label.className = "shader-effects-panel__name";
 		label.textContent = effectName;
 
+		const cloneBtn = document.createElement("button");
+		cloneBtn.type = "button";
+		cloneBtn.className = "shader-effects-panel__clone";
+		cloneBtn.title = "Clone / overdub (stack another instance)";
+		cloneBtn.textContent = "+";
+		cloneBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this._cloneEffect(effectName);
+		});
+
+		const removeBtn = document.createElement("button");
+		removeBtn.type = "button";
+		removeBtn.className = "shader-effects-panel__remove";
+		removeBtn.title = "Remove effect";
+		removeBtn.textContent = "×";
+		removeBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this._removeEffect(effectName);
+		});
+
 		summary.appendChild(handle);
 		summary.appendChild(toggle);
 		summary.appendChild(label);
+		summary.appendChild(cloneBtn);
+		summary.appendChild(removeBtn);
 
 		const body = document.createElement("div");
 		body.className = "shader-effects-panel__body";
@@ -249,10 +310,72 @@ class ShaderEffectsPanel {
 		return drawer;
 	}
 
+	_cloneEffect(sourceName) {
+		if (!this.shaderEffects || typeof this.shaderEffects.cloneEffect !== "function") {
+			console.warn("[shaderEffectsPanel] cloneEffect unavailable");
+			return;
+		}
+
+		const openNames = this._openDrawerNames();
+		const newName = this.shaderEffects.cloneEffect(sourceName);
+		if (!newName) return;
+
+		this._rebuildDrawers();
+		this._restoreOpenDrawers(openNames, newName);
+	}
+
+	_createEffect(templateName) {
+		if (!this.shaderEffects || typeof this.shaderEffects.createEffect !== "function") {
+			console.warn("[shaderEffectsPanel] createEffect unavailable");
+			return;
+		}
+
+		const openNames = this._openDrawerNames();
+		const newName = this.shaderEffects.createEffect(templateName);
+		if (!newName) return;
+
+		this._rebuildDrawers();
+		this._restoreOpenDrawers(openNames, newName);
+	}
+
+	_removeEffect(effectName) {
+		if (!this.shaderEffects || typeof this.shaderEffects.removeEffect !== "function") {
+			console.warn("[shaderEffectsPanel] removeEffect unavailable");
+			return;
+		}
+
+		const openNames = this._openDrawerNames();
+		openNames.delete(effectName);
+		this.shaderEffects.removeEffect(effectName);
+		this._rebuildDrawers();
+		this._restoreOpenDrawers(openNames);
+	}
+
+	_openDrawerNames() {
+		return new Set(
+			[...this.listEl.querySelectorAll(".shader-effects-panel__drawer[open]")].map((el) => el.dataset.effect),
+		);
+	}
+
+	_restoreOpenDrawers(openNames, focusName = null) {
+		for (const name of openNames) {
+			const d = this.drawers.get(name)?.root;
+			if (d) d.open = true;
+		}
+		if (focusName) {
+			const created = this.drawers.get(focusName)?.root;
+			if (created) {
+				created.open = true;
+				created.scrollIntoView({block: "nearest", behavior: "smooth"});
+			}
+		}
+	}
+
 	_editableParams(effect) {
 		const out = [];
 		for (const [key, value] of Object.entries(effect)) {
-			if (key === "enabled" || key === "uniforms") continue;
+			if (key === "enabled" || key === "uniforms" || key === "pass") continue;
+			if (key.startsWith("_")) continue; // internal snapshots
 			if (typeof value === "number") out.push({key, value});
 			else if (Array.isArray(value) && value.length && value.every((v) => typeof v === "number")) {
 				out.push({key, value});
@@ -265,49 +388,56 @@ class ShaderEffectsPanel {
 		const k = key.toLowerCase();
 		const v = Math.abs(Number(value)) || 0;
 
+		// Discrete integers — typed entry allowed but snaps to int + clamped range
+		if (k.includes("mode")) return {min: 0, max: 8, step: 1, integer: true};
+		if (k.includes("levels")) return {min: 1, max: 32, step: 1, integer: true};
+		if (k.includes("sample")) return {min: 1, max: 64, step: 1, integer: true};
+		if (k === "debug" || k.includes("invert") || k.includes("animate")) {
+			return {min: 0, max: 1, step: 1, integer: true};
+		}
+		if (k.includes("filtermode") || k.includes("colormode") || k.includes("gridmode") || k.includes("sortmode")) {
+			return {min: 0, max: 8, step: 1, integer: true};
+		}
+
 		if (
 			k.includes("amount") ||
 			k.includes("threshold") ||
 			k.includes("ratio") ||
 			k.includes("opacity") ||
 			k.includes("mix") ||
-			k.includes("invert") ||
 			k.includes("diffuse") ||
 			k.includes("strength") ||
 			k.includes("falloff") ||
-			k === "debug" ||
 			k.includes("center") ||
-			k.includes("animate") ||
 			(k.includes("gap") && v <= 1)
 		) {
-			return {min: 0, max: 1, step: 0.001};
+			return {min: 0, max: 1, step: 0.001, integer: false};
 		}
 
-		if (k.includes("angle")) return {min: 0, max: Math.PI * 2, step: 0.01};
-		if (k.includes("mode")) return {min: 0, max: 8, step: 1};
-		if (k.includes("levels")) return {min: 1, max: 32, step: 1};
-		if (k.includes("sample")) return {min: 1, max: 64, step: 1};
-		if (k.includes("octave")) return {min: 1, max: 8, step: 0.1};
-		if (k.includes("multiplier") || k.includes("speed")) return {min: 0, max: Math.max(5, v * 3 || 5), step: 0.01};
+		if (k.includes("angle")) return {min: 0, max: Math.PI * 2, step: 0.01, integer: false};
+		if (k.includes("octave")) return {min: 1, max: 8, step: 0.1, integer: false};
+		if (k.includes("multiplier") || k.includes("speed")) {
+			return {min: 0, max: Math.max(5, v * 3 || 5), step: 0.01, integer: false};
+		}
 		if (k.includes("brightness") || k.includes("gain") || k.includes("scale")) {
-			return {min: 0, max: Math.max(2, v * 2 || 2), step: 0.01};
+			return {min: 0, max: Math.max(2, v * 2 || 2), step: 0.01, integer: false};
 		}
 		if (k.includes("size") || k.includes("tile") || k.includes("grid") || k.includes("cell") || k.includes("radius")) {
-			return {min: 0, max: Math.max(64, v * 2 || 64), step: v >= 10 ? 1 : 0.1};
+			return {min: 0, max: Math.max(64, v * 2 || 64), step: v >= 10 ? 1 : 0.1, integer: v >= 10};
 		}
 		if (k.includes("phase") || k.includes("amplitude")) {
-			return {min: -Math.max(10, v * 2), max: Math.max(10, v * 2), step: 0.01};
+			return {min: -Math.max(10, v * 2), max: Math.max(10, v * 2), step: 0.01, integer: false};
 		}
 
 		const max = Math.max(1, v * 3, 1);
-		return {min: Math.min(0, -max * 0.25), max, step: max > 10 ? 0.1 : 0.01};
+		return {min: Math.min(0, -max * 0.25), max, step: max > 10 ? 0.1 : 0.01, integer: false};
 	}
 
 	_createNumberControl(effectName, key, value, componentIndex, componentCount) {
 		const range = this._guessRange(key, value);
 		const labelText = componentIndex == null ? key : `${key}[${componentIndex}]`;
 
-		const root = document.createElement("label");
+		const root = document.createElement("div");
 		root.className = "shader-effects-panel__control";
 
 		const meta = document.createElement("div");
@@ -316,51 +446,111 @@ class ShaderEffectsPanel {
 		const nameEl = document.createElement("span");
 		nameEl.textContent = labelText;
 
-		const valueEl = document.createElement("span");
-		valueEl.className = "shader-effects-panel__control-value";
-		valueEl.textContent = this._formatValue(value);
+		const numberInput = document.createElement("input");
+		numberInput.type = "number";
+		numberInput.className = "shader-effects-panel__number";
+		numberInput.min = String(range.min);
+		numberInput.max = String(range.max);
+		numberInput.step = String(range.step);
+		numberInput.value = this._formatValue(value);
+		numberInput.title = range.integer ? "Integer only" : "Type a value";
+		if (range.integer) numberInput.dataset.integer = "1";
 
 		meta.appendChild(nameEl);
-		meta.appendChild(valueEl);
+		meta.appendChild(numberInput);
 
-		const input = document.createElement("input");
-		input.type = "range";
-		input.min = String(range.min);
-		input.max = String(range.max);
-		input.step = String(range.step);
-		input.value = String(value);
-		input.dataset.effect = effectName;
-		input.dataset.param = key;
-		if (componentIndex != null) input.dataset.index = String(componentIndex);
+		const slider = document.createElement("input");
+		slider.type = "range";
+		slider.className = "shader-effects-panel__slider";
+		slider.min = String(range.min);
+		slider.max = String(range.max);
+		slider.step = String(range.step);
+		slider.value = String(value);
+		slider.dataset.effect = effectName;
+		slider.dataset.param = key;
+		if (componentIndex != null) slider.dataset.index = String(componentIndex);
 
-		const commit = () => {
-			const num = parseFloat(input.value);
-			valueEl.textContent = this._formatValue(num);
+		const setViews = (num) => {
+			slider.value = String(num);
+			numberInput.value = this._formatValue(num);
+		};
+
+		const commit = (raw, {fromNumber = false} = {}) => {
+			let num = parseFloat(raw);
+			if (!Number.isFinite(num)) {
+				numberInput.value = this._formatValue(parseFloat(slider.value));
+				return;
+			}
+
+			if (range.integer) {
+				num = Math.round(num);
+				num = Math.min(range.max, Math.max(range.min, num));
+			} else if (fromNumber) {
+				// Free float entry: expand slider range if needed
+				if (num < parseFloat(slider.min)) slider.min = String(num);
+				if (num > parseFloat(slider.max)) slider.max = String(num);
+				numberInput.min = slider.min;
+				numberInput.max = slider.max;
+			} else {
+				num = Math.min(parseFloat(slider.max), Math.max(parseFloat(slider.min), num));
+			}
+
+			setViews(num);
 			this._applyParam(effectName, key, num, componentIndex, componentCount);
 		};
 
-		input.addEventListener("pointerdown", () => {
+		slider.addEventListener("pointerdown", () => {
 			this._editing = true;
 		});
-		input.addEventListener("pointerup", () => {
+		slider.addEventListener("pointerup", () => {
 			this._editing = false;
 		});
-		input.addEventListener("input", commit);
-		input.addEventListener("change", () => {
+		slider.addEventListener("input", () => commit(slider.value));
+		slider.addEventListener("change", () => {
 			this._editing = false;
-			commit();
+			commit(slider.value);
+		});
+
+		numberInput.addEventListener("focus", () => {
+			this._editing = true;
+		});
+		numberInput.addEventListener("blur", () => {
+			commit(numberInput.value, {fromNumber: !range.integer});
+			this._editing = false;
+		});
+		numberInput.addEventListener("keydown", (e) => {
+			e.stopPropagation();
+			if (e.key === "Enter") {
+				commit(numberInput.value, {fromNumber: !range.integer});
+				numberInput.blur();
+			}
+			if (e.key === "Escape") {
+				numberInput.value = this._formatValue(parseFloat(slider.value));
+				numberInput.blur();
+			}
+		});
+		// Keep slider in sync while typing (integers snap live)
+		numberInput.addEventListener("input", () => {
+			if (range.integer) {
+				const n = parseFloat(numberInput.value);
+				if (Number.isFinite(n)) {
+					const snapped = Math.min(range.max, Math.max(range.min, Math.round(n)));
+					slider.value = String(snapped);
+					this._applyParam(effectName, key, snapped, componentIndex, componentCount);
+				}
+			}
 		});
 
 		root.appendChild(meta);
-		root.appendChild(input);
+		root.appendChild(slider);
 
-		return {root, input, valueEl, key, componentIndex};
+		return {root, input: slider, numberInput, key, componentIndex, integer: !!range.integer};
 	}
 
 	_formatValue(num) {
 		if (!Number.isFinite(num)) return "—";
 		const abs = Math.abs(num);
-		if (abs >= 100) return num.toFixed(0);
+		if (Number.isInteger(num) || abs >= 100) return String(Math.round(num));
 		if (abs >= 10) return num.toFixed(1);
 		if (abs >= 1) return num.toFixed(2);
 		return num.toFixed(3);
@@ -402,11 +592,19 @@ class ShaderEffectsPanel {
 
 				const min = parseFloat(control.input.min);
 				const max = parseFloat(control.input.max);
-				if (value < min) control.input.min = String(value);
-				if (value > max) control.input.max = String(value);
+				if (!control.integer) {
+					if (value < min) {
+						control.input.min = String(value);
+						if (control.numberInput) control.numberInput.min = String(value);
+					}
+					if (value > max) {
+						control.input.max = String(value);
+						if (control.numberInput) control.numberInput.max = String(value);
+					}
+				}
 
 				control.input.value = String(value);
-				control.valueEl.textContent = this._formatValue(value);
+				if (control.numberInput) control.numberInput.value = this._formatValue(value);
 			}
 		}
 	}
