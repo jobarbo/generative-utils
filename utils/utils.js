@@ -564,20 +564,50 @@ function toggleGuides(event) {
 	}
 }
 
+/**
+ * Resolve the on-screen artwork canvas for export.
+ * createGraphics() often claims defaultCanvas0 (and may not be in the DOM);
+ * createCanvas() / WEBGL may use defaultCanvas1+. Prefer the live p5 main canvas.
+ */
+function resolveSaveCanvas() {
+	// p5 global-mode main canvas (HTMLCanvasElement)
+	if (typeof canvas !== "undefined" && canvas instanceof HTMLCanvasElement) {
+		return canvas;
+	}
+	// p5.Element from createCanvas (WEBGL or 2D)
+	if (typeof drawingContext !== "undefined" && drawingContext?.canvas instanceof HTMLCanvasElement) {
+		return drawingContext.canvas;
+	}
+	const byId = document.getElementById("defaultCanvas0");
+	if (byId instanceof HTMLCanvasElement && byId.isConnected) {
+		return byId;
+	}
+	const p5Canvases = [...document.querySelectorAll("canvas.p5Canvas")];
+	const visible = p5Canvases.find((c) => {
+		const r = c.getBoundingClientRect();
+		return r.width > 0 && r.height > 0 && getComputedStyle(c).display !== "none";
+	});
+	if (visible) return visible;
+	return p5Canvases[0] || document.querySelector("canvas");
+}
+
 // make a function to save the canvas as a png file with the git branch name and a timestamp
 function saveArtwork() {
 	const logger = window.Logger || console;
-	var dom_spin = document.querySelector(".spin-container");
 	var output_hash = fxhash;
 	logger.debug ? logger.debug("Hash for save: " + output_hash) : logger.log("Hash for save:", output_hash);
-	var canvas = document.getElementById("defaultCanvas0");
+	var canvasEl = resolveSaveCanvas();
 	var d = new Date();
 	var datestring = `${d.getMonth() + 1}` + "_" + d.getDate() + "_" + d.getFullYear() + "_" + `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}_${fxhash}`;
-	logger.debug ? logger.debug("Canvas element: " + (canvas ? "Found" : "Not found")) : logger.log("Canvas element:", canvas);
+	logger.debug ? logger.debug("Canvas element: " + (canvasEl ? "Found" : "Not found")) : logger.log("Canvas element:", canvasEl);
+	if (!canvasEl) {
+		logger.error ? logger.error("Save failed: no canvas found") : logger.error("Save failed: no canvas found");
+		return;
+	}
 	var fileName = datestring + ".png";
 
 	// Standard download for other browsers
-	const imageUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+	const imageUrl = canvasEl.toDataURL("image/png").replace("image/png", "image/octet-stream");
 	const a = document.createElement("a");
 	a.href = imageUrl;
 	a.setAttribute("download", fileName);
@@ -598,9 +628,9 @@ function createDownloadButton() {
 		return;
 	}
 
-	// Wait a bit for the canvas to be ready (p5 2.x may use ids other than defaultCanvas0)
+	// Wait a bit for the canvas to be ready (p5 2.x / WEBGL may not use defaultCanvas0)
 	setTimeout(() => {
-		const canvas = document.getElementById("defaultCanvas0") || document.querySelector("canvas");
+		const canvas = resolveSaveCanvas();
 		if (!canvas) {
 			console.log("Canvas not ready yet, retrying...");
 			createDownloadButton();
