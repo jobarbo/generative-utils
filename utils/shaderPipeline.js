@@ -65,16 +65,12 @@ class ShaderPipeline {
 			return;
 		}
 
-		const resolveTexture = (texture) => this.shaderManager.resolveTexture(texture);
 		const renderPass = (passName, uniformsProvider, readTex, writeTarget, useRenderRatio = false) => {
-			const uniforms = Object.assign({}, uniformsProvider(), {uTexture: resolveTexture(readTex)});
-			const ctx = writeTarget || this.p5;
-			this.shaderManager.apply(passName, uniforms, ctx).drawFullscreenQuad(ctx, useRenderRatio);
+			this.shaderManager.renderPass(passName, uniformsProvider, readTex, writeTarget || this.p5, useRenderRatio);
 		};
 
 		if (this.passes.length === 0) {
-			// just blit input to screen
-			this.shaderManager.apply("copy", {uTexture: resolveTexture(inputTexture)}, outputTarget).drawFullscreenQuad(outputTarget, true);
+			this.shaderManager.blit(inputTexture, outputTarget, true);
 			return;
 		}
 

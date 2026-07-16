@@ -15,7 +15,7 @@ class ShaderManager {
 			width: 1,
 			height: 1,
 		};
-		this.crispPixels = true; // NEAREST sampling in shader passes
+		this.crispPixels = false; // NEAREST sampling in shader passes
 	}
 
 	/**
@@ -138,13 +138,7 @@ class ShaderManager {
 
 	_looksLikeTexture(value) {
 		if (!value || typeof value !== "object") return false;
-		return (
-			typeof value.width === "number" ||
-			value instanceof HTMLCanvasElement ||
-			value.rawTexture ||
-			value.texture ||
-			typeof value.begin === "function"
-		);
+		return typeof value.width === "number" || value instanceof HTMLCanvasElement || value.rawTexture || value.texture || typeof value.begin === "function";
 	}
 
 	/**
@@ -162,14 +156,68 @@ class ShaderManager {
 	}
 
 	/**
+	 * Whether the texture source needs a Y flip when drawn via drawFullscreenQuad.
+	 * p5.Graphics / 2D canvases: flip. p5.Framebuffer ping-pong buffers: don't flip.
+	 * @param {*} texture
+	 * @returns {boolean}
+	 */
+	shouldFlipTextureSource(texture) {
+		return !this.isFramebufferSource(texture);
+	}
+
+	/**
+	 * p5.Framebuffer vs p5.Graphics — framebuffers use a flipped Y convention in p5 2.x.
+	 * @param {*} texture
+	 * @returns {boolean}
+	 */
+	isFramebufferSource(texture) {
+		return (
+			texture &&
+			typeof texture.begin === "function" &&
+			typeof texture.end === "function" &&
+			texture.color &&
+			typeof texture.color !== "function"
+		);
+	}
+
+	/**
+	 * Apply a shader pass and draw a fullscreen quad with correct Y orientation.
+	 * All effects should go through this — do not call drawFullscreenQuad directly.
+	 *
+	 * @param {string} passName - Registered shader name
+	 * @param {object|function} uniformsProvider - Uniform values or () => uniforms
+	 * @param {*} readTex - p5.Graphics, p5.Framebuffer, or sampler source
+	 * @param {p5.Graphics|p5} [writeTarget] - Render target (defaults to p5 instance)
+	 * @param {boolean} [useRenderRatio=false] - Apply setRenderRatio() crop on final pass
+	 */
+	renderPass(passName, uniformsProvider, readTex, writeTarget = null, useRenderRatio = false) {
+		const uniforms =
+			typeof uniformsProvider === "function" ? uniformsProvider() : uniformsProvider || {};
+		const flipY = this.shouldFlipTextureSource(readTex);
+		const ctx = writeTarget || this.p5Instance;
+		return this.apply(passName, {...uniforms, uTexture: this.resolveTexture(readTex)}, ctx).drawFullscreenQuad(
+			ctx,
+			useRenderRatio,
+			flipY
+		);
+	}
+
+	/**
+	 * Blit a texture to a target with the copy shader (correct Y for Graphics vs Framebuffer).
+	 */
+	blit(readTex, writeTarget = null, useRenderRatio = false) {
+		return this.renderPass("copy", {}, readTex, writeTarget, useRenderRatio);
+	}
+
+	/**
 	 * Draw a fullscreen quad to render the shader.
-	 * Vertex shaders use aPosition as clip-space NDC (-1..1).
-	 * Custom ratios crop the texture (object-fit: cover) to fill the canvas.
+	 * Prefer renderPass() — handles flipY automatically from the source texture type.
 	 *
 	 * @param {p5.Graphics|p5} [target] - Render target (defaults to p5 instance).
 	 * @param {boolean} [useRenderRatio=false] - When true, apply setRenderRatio() on the final pass.
+	 * @param {boolean} [flipY=false] - Flip V coords (needed when sampling p5.Graphics / 2D canvases).
 	 */
-	drawFullscreenQuad(target = null, useRenderRatio = false) {
+	drawFullscreenQuad(target = null, useRenderRatio = false, flipY = false) {
 		const ctx = target || this.p5Instance;
 		const canvasW = ctx.width;
 		const canvasH = ctx.height;
@@ -182,6 +230,9 @@ class ShaderManager {
 			({u0, v0, u1, v1} = this.getCoverUVBounds(canvasW, canvasH));
 		}
 
+		const topV = flipY ? v1 : v0;
+		const bottomV = flipY ? v0 : v1;
+
 		ctx.push();
 		ctx.noStroke();
 		if (typeof ctx.resetMatrix === "function") {
@@ -189,10 +240,10 @@ class ShaderManager {
 		}
 
 		ctx.beginShape();
-		ctx.vertex(-1, 1, 0, u0, v0);
-		ctx.vertex(1, 1, 0, u1, v0);
-		ctx.vertex(1, -1, 0, u1, v1);
-		ctx.vertex(-1, -1, 0, u0, v1);
+		ctx.vertex(-1, 1, 0, u0, topV);
+		ctx.vertex(1, 1, 0, u1, topV);
+		ctx.vertex(1, -1, 0, u1, bottomV);
+		ctx.vertex(-1, -1, 0, u0, bottomV);
 		ctx.endShape(ctx.CLOSE);
 
 		ctx.pop();
@@ -207,7 +258,7 @@ class ShaderManager {
 	 * @param {number} pixelDensity - Physical pixel density multiplier
 	 * @returns {p5.Framebuffer}
 	 */
-	createBuffer(width, height, pixelDensity = 1) {
+	createBuffer(width, height, pixelDensity = 2) {
 		if (!this.p5Instance) {
 			console.error("ShaderManager not initialized");
 			return null;

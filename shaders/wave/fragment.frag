@@ -19,8 +19,8 @@ uniform float uWaveAmount; // cartesian ripple amplitude (legacy ≈ 0.00001 —
 uniform float uWaveFrequency; // cartesian ripple frequency (legacy ≈ 1.0)
 
 void main() {
-	// Flip the y coordinate to match p5js coordinate system
-	vec2 uv = vec2(vTexCoord.x, 1.0 - vTexCoord.y);
+	// UV orientation is corrected in shaderManager.renderPass / drawFullscreenQuad
+	vec2 uv = vTexCoord;
 	vec2 originalUV = uv;
 
 	// Offset from configurable center (default 0.5, 0.5 = canvas center)

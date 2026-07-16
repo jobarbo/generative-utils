@@ -1,6 +1,180 @@
 let noiseCanvasWidth = 1;
 let noiseCanvasHeight = 1;
 
+/**
+ * p5 2.x top-level globals compat.
+ * Math helpers like max/min/map are only bound to window after the p5 instance
+ * starts. Top-level sketch code (e.g. `const DEFAULT_SIZE = max(...)`) needs
+ * them earlier — otherwise the throw leaves later `let` bindings in the TDZ
+ * while hoisted setup() still runs. Lives here because every branch already
+ * loads utils.js before sketch.js. p5 overwrites these once global mode inits.
+ */
+(function (root) {
+	if (!root || root.__p5ToplevelCompatApplied) return;
+	root.__p5ToplevelCompatApplied = true;
+
+	function define(name, fn) {
+		if (typeof root[name] === "undefined") root[name] = fn;
+	}
+	function toNums(args) {
+		return args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+	}
+
+	define("abs", Math.abs);
+	define("ceil", Math.ceil);
+	define("exp", Math.exp);
+	define("floor", Math.floor);
+	define("log", Math.log);
+	define("pow", Math.pow);
+	define("round", Math.round);
+	define("sqrt", Math.sqrt);
+	define("sq", (n) => n * n);
+	define("fract", (n) => n - Math.floor(n));
+
+	define("sin", Math.sin);
+	define("cos", Math.cos);
+	define("tan", Math.tan);
+	define("asin", Math.asin);
+	define("acos", Math.acos);
+	define("atan", Math.atan);
+	define("atan2", Math.atan2);
+
+	define("degrees", (radians) => (radians * 180) / Math.PI);
+	define("radians", (degrees) => (degrees * Math.PI) / 180);
+
+	define("min", function () {
+		return Math.min.apply(Math, toNums(arguments));
+	});
+	define("max", function () {
+		return Math.max.apply(Math, toNums(arguments));
+	});
+	define("constrain", (n, low, high) => Math.max(Math.min(n, high), low));
+	define("lerp", (start, stop, amt) => start + (stop - start) * amt);
+	define("norm", (value, start, stop) => (value - start) / (stop - start));
+	define("map", (value, start1, stop1, start2, stop2, withinBounds) => {
+		const outgoing = start2 + ((stop2 - start2) * (value - start1)) / (stop1 - start1);
+		if (!withinBounds) return outgoing;
+		if (start2 < stop2) return Math.max(Math.min(outgoing, stop2), start2);
+		return Math.max(Math.min(outgoing, start2), stop2);
+	});
+	define("dist", function () {
+		if (arguments.length === 4) {
+			return Math.hypot(arguments[2] - arguments[0], arguments[3] - arguments[1]);
+		}
+		if (arguments.length === 6) {
+			return Math.hypot(arguments[3] - arguments[0], arguments[4] - arguments[1], arguments[5] - arguments[2]);
+		}
+		return NaN;
+	});
+	define("mag", function () {
+		if (arguments.length === 2) return Math.hypot(arguments[0], arguments[1]);
+		if (arguments.length === 3) return Math.hypot(arguments[0], arguments[1], arguments[2]);
+		return NaN;
+	});
+
+	const constants = {
+		PI: Math.PI,
+		TWO_PI: Math.PI * 2,
+		HALF_PI: Math.PI / 2,
+		QUARTER_PI: Math.PI / 4,
+		TAU: Math.PI * 2,
+	};
+	for (const [name, value] of Object.entries(constants)) {
+		if (typeof root[name] === "undefined") root[name] = value;
+	}
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * p5 2.x preload() compatibility (based on processing/p5.js-compatibility).
+ * p5 2 no longer calls preload(); this addon runs window.preload in presetup
+ * and restores 1.x-style load* stubs so existing sketches keep working.
+ */
+(function registerP5PreloadCompat(root) {
+	if (!root || root.__p5PreloadCompatApplied) return;
+	if (typeof p5 === "undefined" || typeof p5.registerAddon !== "function") return;
+	root.__p5PreloadCompatApplied = true;
+
+	function addPreload(p5Ctor, fn, lifecycles) {
+		const placeholderFactories = {
+			loadImage: () => new p5Ctor.Image(1, 1),
+			loadModel: () => new p5Ctor.Geometry(),
+			loadJSON: () => ({}),
+			loadStrings: () => [],
+			loadFont: (pInst) => new p5Ctor.Font(pInst, new FontFace("default", "default.woff")),
+		};
+
+		p5Ctor.isPreloadSupported = function () {
+			return true;
+		};
+
+		const promises = [];
+
+		for (const method in placeholderFactories) {
+			if (typeof fn[method] !== "function") continue;
+			const prevMethod = fn[method];
+			fn[method] = function (...args) {
+				if (!this._isInPreload) return prevMethod.apply(this, args);
+				const obj = placeholderFactories[method](this);
+				const promise = Promise.resolve(prevMethod.apply(this, args)).then((result) => {
+					if (result && typeof result === "object") {
+						for (const key in result) obj[key] = result[key];
+					}
+					return result;
+				});
+				promises.push(promise);
+				return obj;
+			};
+		}
+
+		// loadShader is used heavily by this library; track it during preload too
+		if (typeof fn.loadShader === "function") {
+			const prevLoadShader = fn.loadShader;
+			fn.loadShader = function (...args) {
+				const result = prevLoadShader.apply(this, args);
+				if (this._isInPreload && result && typeof result.then === "function") {
+					promises.push(result);
+				}
+				return result;
+			};
+		}
+
+		if (typeof fn.loadBytes === "function") {
+			const prevLoadBytes = fn.loadBytes;
+			fn.loadBytes = function (...args) {
+				if (!this._isInPreload) return prevLoadBytes.apply(this, args);
+				const obj = {};
+				promises.push(
+					Promise.resolve(prevLoadBytes.apply(this, args)).then((result) => {
+						obj.bytes = result;
+						return result;
+					})
+				);
+				return obj;
+			};
+		}
+
+		lifecycles.presetup = async function () {
+			const preloadFn = root.preload;
+			if (typeof preloadFn !== "function") return;
+
+			this._isInPreload = true;
+			try {
+				const maybePromise = preloadFn.call(this);
+				if (maybePromise && typeof maybePromise.then === "function") {
+					promises.push(maybePromise);
+				}
+			} finally {
+				this._isInPreload = false;
+			}
+
+			await Promise.all(promises);
+			promises.length = 0;
+		};
+	}
+
+	p5.registerAddon(addPreload);
+})(typeof window !== "undefined" ? window : globalThis);
+
 // Check if the sketch is running in an iframe
 function isInIframe() {
 	try {

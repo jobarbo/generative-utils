@@ -12,9 +12,8 @@ uniform float uGapSize;      // Gap border fraction per side (0.0 = no gap, 0.1 
 uniform float uGapBrightness; // Gap fill: 0.0 = black gaps, 1.0 = show cell color in gap
 
 void main() {
-	// Match p5.js / pipeline UV (same flip as wave) — avoids a vertical flip when
-	// pixelGrid runs after ping-pong framebuffers or as a final pass.
-	vec2 uv = vec2(vTexCoord.x, 1.0 - vTexCoord.y);
+	// UV orientation is corrected in shaderManager.renderPass / drawFullscreenQuad
+	vec2 uv = vTexCoord;
 
 	// --- QUANTIZATION ---
 	// Map UV into cell-space [0..cols, 0..rows]
