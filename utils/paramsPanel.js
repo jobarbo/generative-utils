@@ -451,6 +451,19 @@
 		btnApply.addEventListener("click", async () => {
 			setStatus(true);
 			setText(".kb-params.dashboard", "rendering…");
+
+			// Hide the old artwork right away, then yield a frame so the browser
+			// paints the reset + status before the heavy synchronous re-render
+			// (otherwise the stale artwork stays frozen on screen until Apply finishes).
+			const canvasEl = document.querySelector("canvas.p5Canvas") || document.querySelector("canvas");
+			const prevOpacity = canvasEl ? canvasEl.style.opacity : "";
+			const prevTransition = canvasEl ? canvasEl.style.transition : "";
+			if (canvasEl) {
+				canvasEl.style.transition = "none";
+				canvasEl.style.opacity = "0";
+			}
+			await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+
 			try {
 				for (const def of uiDefs) {
 					const key = def.key;
@@ -487,6 +500,11 @@
 					setText(".kb-params.dashboard", "sketch not ready");
 				}
 			} finally {
+				// Reveal the fresh render (applyGenerativeSettings has drawn its first frame)
+				if (canvasEl) {
+					canvasEl.style.opacity = prevOpacity;
+					canvasEl.style.transition = prevTransition;
+				}
 				// Rendering continues asynchronously; completion flips status off.
 			}
 		});
