@@ -11,7 +11,7 @@ class ShaderManager {
 		this.p5Instance = null;
 		this.basePath = "";
 		this.renderRatio = {
-			fitCanvas: false,
+			fitCanvas: true,
 			width: 1,
 			height: 1,
 		};
@@ -171,13 +171,7 @@ class ShaderManager {
 	 * @returns {boolean}
 	 */
 	isFramebufferSource(texture) {
-		return (
-			texture &&
-			typeof texture.begin === "function" &&
-			typeof texture.end === "function" &&
-			texture.color &&
-			typeof texture.color !== "function"
-		);
+		return texture && typeof texture.begin === "function" && typeof texture.end === "function" && texture.color && typeof texture.color !== "function";
 	}
 
 	/**
@@ -191,15 +185,10 @@ class ShaderManager {
 	 * @param {boolean} [useRenderRatio=false] - Apply setRenderRatio() crop on final pass
 	 */
 	renderPass(passName, uniformsProvider, readTex, writeTarget = null, useRenderRatio = false) {
-		const uniforms =
-			typeof uniformsProvider === "function" ? uniformsProvider() : uniformsProvider || {};
+		const uniforms = typeof uniformsProvider === "function" ? uniformsProvider() : uniformsProvider || {};
 		const flipY = this.shouldFlipTextureSource(readTex);
 		const ctx = writeTarget || this.p5Instance;
-		return this.apply(passName, {...uniforms, uTexture: this.resolveTexture(readTex)}, ctx).drawFullscreenQuad(
-			ctx,
-			useRenderRatio,
-			flipY
-		);
+		return this.apply(passName, {...uniforms, uTexture: this.resolveTexture(readTex)}, ctx).drawFullscreenQuad(ctx, useRenderRatio, flipY);
 	}
 
 	/**
