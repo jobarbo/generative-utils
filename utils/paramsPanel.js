@@ -388,6 +388,9 @@
 		const uiDefs = Array.isArray(p.ui) ? p.ui : [];
 		const paletteCurrentKey = findPaletteCurrentKey(uiDefs);
 		const presentationCurrentKey = findPresentationCurrentKey(uiDefs);
+		// Rows with section: "palette" are relocated into the palette-creator
+		// fieldset once it exists (fallback: stay in the main form)
+		const paletteSectionRows = [];
 
 		for (const def of uiDefs) {
 			const key = def.key;
@@ -408,6 +411,7 @@
 			row.appendChild(span);
 			row.appendChild(select);
 			form.appendChild(row);
+			if (def.section === "palette") paletteSectionRows.push(row);
 
 			controls[key] = select;
 
@@ -455,12 +459,17 @@
 			// Hide the old artwork right away, then yield a frame so the browser
 			// paints the reset + status before the heavy synchronous re-render
 			// (otherwise the stale artwork stays frozen on screen until Apply finishes).
-			const canvasEl = document.querySelector("canvas.p5Canvas") || document.querySelector("canvas");
-			const prevOpacity = canvasEl ? canvasEl.style.opacity : "";
-			const prevTransition = canvasEl ? canvasEl.style.transition : "";
-			if (canvasEl) {
-				canvasEl.style.transition = "none";
-				canvasEl.style.opacity = "0";
+			// Hide every on-screen canvas: the artwork may be presented on the WEBGL
+			// shader canvas rather than the first .p5Canvas in the DOM.
+			const hiddenCanvases = [...document.querySelectorAll("canvas")]
+				.filter((c) => {
+					const r = c.getBoundingClientRect();
+					return r.width > 0 && r.height > 0 && getComputedStyle(c).display !== "none";
+				})
+				.map((c) => ({el: c, opacity: c.style.opacity, transition: c.style.transition}));
+			for (const h of hiddenCanvases) {
+				h.el.style.transition = "none";
+				h.el.style.opacity = "0";
 			}
 			await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 
@@ -501,9 +510,9 @@
 				}
 			} finally {
 				// Reveal the fresh render (applyGenerativeSettings has drawn its first frame)
-				if (canvasEl) {
-					canvasEl.style.opacity = prevOpacity;
-					canvasEl.style.transition = prevTransition;
+				for (const h of hiddenCanvases) {
+					h.el.style.opacity = h.opacity;
+					h.el.style.transition = h.transition;
 				}
 				// Rendering continues asynchronously; completion flips status off.
 			}
@@ -566,6 +575,17 @@
 				storageKey,
 				paletteCurrentKey
 			);
+		}
+
+		// Move section:"palette" rows into the palette fieldset, under the preview
+		if (paletteSectionRows.length) {
+			const fieldset = form.querySelector(".palette-creator");
+			const preview = fieldset?.querySelector(".palette-preview");
+			if (preview) {
+				preview.after(...paletteSectionRows);
+			} else if (fieldset) {
+				fieldset.append(...paletteSectionRows);
+			}
 		}
 
 		root.addEventListener("render:started", () => {
