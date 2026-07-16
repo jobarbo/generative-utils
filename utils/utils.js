@@ -252,11 +252,15 @@ function shadersEnabled(flag = true) {
 function flushGraphicsStyleCache(g) {
 	if (!g?.fill || !g?.colorMode) return;
 	try {
-		g.push();
+		// No push/pop here: pop() restores p5's cached style state, which would
+		// undo the bust and let p5 keep skipping fillStyle writes that match its
+		// stale cache (the context may hold a raw fillStyle written directly by
+		// drawing code, e.g. Mover.show). Callers must set their own colorMode
+		// and fill/stroke after this.
 		g.colorMode(RGB, 255, 255, 255, 255);
-		g.fill(255, 0, 255, 255); // unlikely to match any intended fill
+		g.fill(255, 0, 255, 255); // sentinel — unlikely to match any intended fill
+		g.stroke(255, 0, 255, 255);
 		g.noStroke();
-		g.pop();
 	} catch {
 		// ignore
 	}
