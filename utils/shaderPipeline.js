@@ -65,8 +65,8 @@ class ShaderPipeline {
 			return;
 		}
 
-		const renderPass = (passName, uniformsProvider, readTex, writeTarget, useRenderRatio = false) => {
-			this.shaderManager.renderPass(passName, uniformsProvider, readTex, writeTarget || this.p5, useRenderRatio);
+		const renderPass = (passName, uniformsProvider, readTex, writeTarget, useRenderRatio = false, writesToFramebuffer = false) => {
+			this.shaderManager.renderPass(passName, uniformsProvider, readTex, writeTarget || this.p5, useRenderRatio, writesToFramebuffer);
 		};
 
 		if (this.passes.length === 0) {
@@ -94,7 +94,8 @@ class ShaderPipeline {
 				const writeBuf = this.buffers[ping];
 				writeBuf.begin();
 				this.p5.clear();
-				renderPass(name, uniformsProvider, readTex, this.p5, false);
+				// writesToFramebuffer: toggle Y so the buffer stores upright content
+				renderPass(name, uniformsProvider, readTex, this.p5, false, true);
 				writeBuf.end();
 				readTex = writeBuf;
 				ping = 1 - ping;

@@ -183,10 +183,16 @@ class ShaderManager {
 	 * @param {*} readTex - p5.Graphics, p5.Framebuffer, or sampler source
 	 * @param {p5.Graphics|p5} [writeTarget] - Render target (defaults to p5 instance)
 	 * @param {boolean} [useRenderRatio=false] - Apply setRenderRatio() crop on final pass
+	 * @param {boolean} [writesToFramebuffer=false] - Set true when the quad is drawn
+	 *   inside fbo.begin()/end(). Writing clip-space geometry into a framebuffer
+	 *   inverts Y vs the screen, so the flip decision must be toggled to keep the
+	 *   stored texture in "no flip needed" orientation. Without this, every
+	 *   intermediate ping-pong pass adds one flip (visible with 2+ effects).
 	 */
-	renderPass(passName, uniformsProvider, readTex, writeTarget = null, useRenderRatio = false) {
+	renderPass(passName, uniformsProvider, readTex, writeTarget = null, useRenderRatio = false, writesToFramebuffer = false) {
 		const uniforms = typeof uniformsProvider === "function" ? uniformsProvider() : uniformsProvider || {};
-		const flipY = this.shouldFlipTextureSource(readTex);
+		let flipY = this.shouldFlipTextureSource(readTex);
+		if (writesToFramebuffer) flipY = !flipY;
 		const ctx = writeTarget || this.p5Instance;
 		return this.apply(passName, {...uniforms, uTexture: this.resolveTexture(readTex)}, ctx).drawFullscreenQuad(ctx, useRenderRatio, flipY);
 	}
