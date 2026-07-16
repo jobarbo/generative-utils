@@ -117,6 +117,12 @@ class AudioKnob {
 			return;
 		}
 
+		// No live signal (mic locked, denied, or silent) — don't drive params,
+		// otherwise hand-set panel values get mapped back to outMin every frame
+		if (typeof audioAnalyzer.getSourceStatus === "function" && !audioAnalyzer.getSourceStatus().receiving) {
+			return;
+		}
+
 		// Handle beat pulse (smooth decay for frame-based animation)
 		if (audioAnalyzer.isBeat) {
 			this.beatPulse = 1.0;
