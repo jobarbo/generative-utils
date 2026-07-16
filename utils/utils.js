@@ -270,6 +270,28 @@ let clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 let smoothstep = (a, b, x) => (((x -= a), (x /= b - a)) < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x));
 let mix = (a, b, p) => a + p * (b - a);
 
+/**
+ * Deterministic float in [0, 1) from fxhash without advancing `$fx.rand()` / `fxrand()`.
+ * Use this in optional library subsystems (shaders, overlays, helpers) so enabling
+ * them cannot shift the project's composition random stream.
+ * @param {number|string} [salt=0] - Domain separator so multiple callers don't collide
+ * @returns {number}
+ */
+function fxhashSeed(salt = 0) {
+	const hash = String((typeof $fx !== "undefined" && $fx.hash) || (typeof fxhash !== "undefined" && fxhash) || "");
+	const saltStr = String(salt);
+	let h = 0x811c9dc5; // FNV-1a offset basis
+	for (let i = 0; i < hash.length; i++) {
+		h ^= hash.charCodeAt(i);
+		h = Math.imul(h, 0x01000193);
+	}
+	for (let i = 0; i < saltStr.length; i++) {
+		h ^= saltStr.charCodeAt(i);
+		h = Math.imul(h, 0x01000193);
+	}
+	return (h >>> 0) / 4294967296;
+}
+
 // Array[2] dot product — use var (not function) so p5 can bind its own global `dot`.
 var vec2Dot = function (v1, v2) {
 	if (v1.length !== 2 || v2.length !== 2) {

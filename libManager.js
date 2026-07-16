@@ -160,6 +160,7 @@ class LibManager {
 					multiply: window.multiply,
 					length: window.length,
 					randomInt: window.randomInt,
+					fxhashSeed: window.fxhashSeed,
 					R: window.R,
 					L: window.L,
 					k: window.k,
