@@ -6,7 +6,7 @@ uniform sampler2D uTexture;
 uniform vec2 uResolution;
 uniform vec2 uCenter; // center of symmetry (normalized coords)
 uniform float uSeed;
-uniform float uSymmetryMode; // 0=horizontal, 1=vertical, 2=2-line, 3=4-line, 4=8-line, 5=16-line, 6=radial
+uniform float uSymmetryMode; // 0=H 2fold, 1=V 2fold, 2=2-line 4fold, 3=4-line 8fold, 4=8-line 16fold, 5=16-line 32fold, 6=radial
 uniform float uAmount; // blend strength [0..1]
 uniform float uDebug; // 0.0 = normal, 1.0 = debug mode
 uniform float uTime; // time for animation
@@ -107,75 +107,53 @@ vec2 verticalSymmetry(vec2 uv) {
 	return mirrored + center;
 }
 
-// 2-line symmetry: mirror across both horizontal and vertical center lines (one quadrant reflects to all four)
+// 2-line symmetry (4-fold): mirror across H + V center lines
 vec2 twoLineSymmetry(vec2 uv) {
 	vec2 center = uCenter;
 	vec2 offset = uv - center;
-	// Mirror both X and Y coordinates
 	vec2 mirrored = vec2(abs(offset.x), abs(offset.y));
 	return mirrored + center;
 }
 
-// 4-line symmetry: create 4 quadrants with symmetry
+// 4-line symmetry (8-fold): H + V + diagonal fold
 vec2 fourLineSymmetry(vec2 uv) {
 	vec2 center = uCenter;
 	vec2 offset = uv - center;
-
-	// Determine which quadrant we're in
-	float quadX = step(0.0, offset.x);
-	float quadY = step(0.0, offset.y);
-
-	// Map to first quadrant (top-right)
-	vec2 firstQuad = vec2(
-		abs(offset.x),
-		abs(offset.y)
-	);
-
-	return firstQuad + center;
-}
-
-// 8-line symmetry: create 8 sections with symmetry
-vec2 eightLineSymmetry(vec2 uv) {
-	vec2 center = uCenter;
-	vec2 offset = uv - center;
-
-	// Take absolute values to fold into one quadrant
 	vec2 absOffset = abs(offset);
-
-	// Now fold along the diagonal to create 8-fold symmetry
-	// If absOffset.x < absOffset.y, swap them
+	// Fold along the diagonal to create 8-fold symmetry
 	vec2 folded = (absOffset.x < absOffset.y) ? vec2(absOffset.y, absOffset.x) : absOffset;
-
 	return folded + center;
 }
 
-// 16-line symmetry: create 16 sections with smoother transitions
+// 8-line symmetry (16-fold): 8-fold + fold each octant in half
+vec2 eightLineSymmetry(vec2 uv) {
+	vec2 center = uCenter;
+	vec2 offset = uv - center;
+	vec2 absOffset = abs(offset);
+	vec2 folded8 = (absOffset.x < absOffset.y) ? vec2(absOffset.y, absOffset.x) : absOffset;
+
+	float angle = atan(folded8.y, folded8.x);
+	float radius = length(folded8);
+	float octantAngle = mod(angle, 3.14159265 / 4.0);
+	float foldedAngle = min(octantAngle, 3.14159265 / 4.0 - octantAngle);
+
+	return vec2(cos(foldedAngle), sin(foldedAngle)) * radius + center;
+}
+
+// 16-line symmetry (32-fold): 16-fold + fold each sixteenth in half
 vec2 sixteenLineSymmetry(vec2 uv) {
 	vec2 center = uCenter;
 	vec2 offset = uv - center;
-
-	// Take absolute values to fold into one quadrant (creates 4-fold)
 	vec2 absOffset = abs(offset);
-
-	// Create 8-fold symmetry by folding across main diagonal
 	vec2 folded8 = (absOffset.x < absOffset.y) ? vec2(absOffset.y, absOffset.x) : absOffset;
 
-	// For smooth 16-fold: use the angle to create a subtle additional fold
-	// Instead of a harsh swap, we gradually blend toward the fold
 	float angle = atan(folded8.y, folded8.x);
 	float radius = length(folded8);
-
-	// Normalize angle to [0, PI/4] range for the octant
 	float octantAngle = mod(angle, 3.14159265 / 4.0);
+	float sixteenth = min(octantAngle, 3.14159265 / 4.0 - octantAngle);
+	float foldedAngle = min(sixteenth, 3.14159265 / 8.0 - sixteenth);
 
-	// Create 16 sections by treating the octant as a 2-fold symmetric region
-	// Fold angle back into [0, PI/8] range
-	float foldedAngle = min(octantAngle, 3.14159265 / 4.0 - octantAngle);
-
-	// Convert back to Cartesian
-	vec2 folded16 = vec2(cos(foldedAngle), sin(foldedAngle)) * radius;
-
-	return folded16 + center;
+	return vec2(cos(foldedAngle), sin(foldedAngle)) * radius + center;
 }
 
 // Radial symmetry: create radial pattern
@@ -338,35 +316,42 @@ void main() {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 2) {
-			// Both horizontal and vertical lines
+			// 2-line (4-fold): H + V
 			if (abs(uv.y - uCenter.y) < lineThickness || abs(uv.x - uCenter.x) < lineThickness) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 3) {
-			// Both horizontal and vertical lines
-			if (abs(uv.y - uCenter.y) < lineThickness || abs(uv.x - uCenter.x) < lineThickness) {
+			// 4-line (8-fold): H + V + diagonals
+			vec2 d3 = uv - uCenter;
+			if (abs(d3.y) < lineThickness || abs(d3.x) < lineThickness ||
+				abs(d3.x - d3.y) < lineThickness || abs(d3.x + d3.y) < lineThickness) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 4) {
-			// Horizontal, vertical, and two diagonals through uCenter (8-fold)
+			// 8-line (16-fold): H/V, 45°, and 22.5°/67.5°
 			vec2 d4 = uv - uCenter;
-			if (abs(d4.y) < lineThickness || abs(d4.x) < lineThickness ||
-				abs(d4.x - d4.y) < lineThickness || abs(d4.x + d4.y) < lineThickness) {
+			vec2 absOffset4 = abs(d4);
+			bool centerCross4 = abs(d4.y) < lineThickness || abs(d4.x) < lineThickness;
+			bool diagonals4 = abs(d4.x - d4.y) < lineThickness || abs(d4.x + d4.y) < lineThickness;
+			float tan22_5 = 0.41421356;
+			bool lines22_5 = abs(absOffset4.y - absOffset4.x * tan22_5) < lineThickness * 0.5;
+			bool lines67_5 = abs(absOffset4.x - absOffset4.y * tan22_5) < lineThickness * 0.5;
+			if (centerCross4 || diagonals4 || lines22_5 || lines67_5) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 5) {
-			// H/V, 45° diagonals, and 22.5°/67.5° lines — all relative to uCenter (16-fold)
+			// 16-line (32-fold): previous + 11.25° family
 			vec2 d5 = uv - uCenter;
 			vec2 absOffset = abs(d5);
-
 			bool centerCross = abs(d5.y) < lineThickness || abs(d5.x) < lineThickness;
 			bool diagonals = abs(d5.x - d5.y) < lineThickness || abs(d5.x + d5.y) < lineThickness;
-
-			float tan22_5 = 0.41421356; // tan(22.5°)
+			float tan22_5 = 0.41421356;
+			float tan11_25 = 0.198912367;
 			bool lines22_5 = abs(absOffset.y - absOffset.x * tan22_5) < lineThickness * 0.5;
 			bool lines67_5 = abs(absOffset.x - absOffset.y * tan22_5) < lineThickness * 0.5;
-
-			if (centerCross || diagonals || lines22_5 || lines67_5) {
+			bool lines11_25 = abs(absOffset.y - absOffset.x * tan11_25) < lineThickness * 0.5;
+			bool lines78_75 = abs(absOffset.x - absOffset.y * tan11_25) < lineThickness * 0.5;
+			if (centerCross || diagonals || lines22_5 || lines67_5 || lines11_25 || lines78_75) {
 				debugColor = vec4(0.0, 1.0, 0.0, 1.0); // Green
 			}
 		} else if (mode == 6) {
