@@ -637,10 +637,7 @@ function fitDisplayToViewport() {
 	let logicalW = typeof width === "number" && width > 0 ? width : 0;
 	let logicalH = typeof height === "number" && height > 0 ? height : 0;
 	if (!logicalW || !logicalH) {
-		const density =
-			(typeof pixelDensity === "function" ? pixelDensity() : null) ||
-			(typeof pixel_density === "number" ? pixel_density : 1) ||
-			1;
+		const density = (typeof pixelDensity === "function" ? pixelDensity() : null) || (typeof pixel_density === "number" ? pixel_density : 1) || 1;
 		logicalW = (canvasEl.width || 1) / Math.max(1, density);
 		logicalH = (canvasEl.height || 1) / Math.max(1, density);
 	}
@@ -662,7 +659,13 @@ function fitDisplayToViewport() {
 	if (typeof updateDebugOverlay === "function" && typeof debugBounds !== "undefined") {
 		try {
 			const padding =
-				typeof CANVAS_CONFIG !== "undefined" ? CANVAS_CONFIG.ARTWORK_PADDING : typeof BASE_PADDING !== "undefined" ? BASE_PADDING : 0.1;
+				typeof getArtworkPaddingNorm === "function"
+					? getArtworkPaddingNorm(typeof width === "number" ? width : 1, typeof height === "number" ? height : 1)
+					: typeof CANVAS_CONFIG !== "undefined"
+						? CANVAS_CONFIG.ARTWORK_PADDING
+						: typeof BASE_PADDING !== "undefined"
+							? BASE_PADDING
+							: 0.1;
 			updateDebugOverlay({
 				debugBounds: !!debugBounds,
 				padding,
@@ -1161,10 +1164,23 @@ function updateDebugOverlay({debugBounds = false, padding = 0.1, movers = [], ov
 	debugOverlay.style.height = canvasHeight + "px";
 
 	if (basePaddingEl) {
-		basePaddingEl.style.left = padding * canvasWidth + "px";
-		basePaddingEl.style.top = padding * canvasHeight + "px";
-		basePaddingEl.style.width = (1 - 2 * padding) * canvasWidth + "px";
-		basePaddingEl.style.height = (1 - 2 * padding) * canvasHeight + "px";
+		let padX;
+		let padY;
+		if (padding && typeof padding === "object") {
+			padX = Number(padding.x) || 0;
+			padY = Number(padding.y) || 0;
+		} else {
+			// Single fraction of the shorter display edge → equal absolute border
+			const pad = Math.max(0, Math.min(0.49, Number(padding) || 0));
+			const shortEdge = Math.min(canvasWidth, canvasHeight) || 1;
+			const padPx = pad * shortEdge;
+			padX = padPx / (canvasWidth || 1);
+			padY = padPx / (canvasHeight || 1);
+		}
+		basePaddingEl.style.left = padX * canvasWidth + "px";
+		basePaddingEl.style.top = padY * canvasHeight + "px";
+		basePaddingEl.style.width = (1 - 2 * padX) * canvasWidth + "px";
+		basePaddingEl.style.height = (1 - 2 * padY) * canvasHeight + "px";
 	}
 
 	if (moverBoundsEl && movers.length > 0) {
