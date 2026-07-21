@@ -23,6 +23,8 @@
 		presentation: false,
 	};
 
+	const CONTROLS_STORAGE_KEY = "fx_longform2:controlsPanel";
+
 	const FORMATTERS = {
 		compactNumber(n) {
 			if (n >= 1000000) {
@@ -41,6 +43,61 @@
 
 	function getParams() {
 		return root.PARAMS_UI;
+	}
+
+	function controlsPersistEnabled() {
+		return typeof PERSIST_CONTROLS_PANEL === "undefined" || !!PERSIST_CONTROLS_PANEL;
+	}
+
+	function loadPersistedControls(p) {
+		if (!controlsPersistEnabled() || !p?.current) return false;
+		try {
+			const raw = localStorage.getItem(CONTROLS_STORAGE_KEY);
+			if (!raw) return false;
+			const data = JSON.parse(raw);
+			if (!data || data.version !== 1 || !data.current || typeof data.current !== "object") return false;
+			p.current = {...p.current, ...data.current};
+			return true;
+		} catch (error) {
+			console.warn("[ParamsPanel] loadPersistedControls failed:", error);
+			return false;
+		}
+	}
+
+	function savePersistedControls(p) {
+		if (!controlsPersistEnabled() || !p?.current) return;
+		try {
+			localStorage.setItem(CONTROLS_STORAGE_KEY, JSON.stringify({version: 1, current: {...p.current}}));
+		} catch (error) {
+			console.warn("[ParamsPanel] savePersistedControls failed:", error);
+		}
+	}
+
+	function clearPersistedControls() {
+		try {
+			localStorage.removeItem(CONTROLS_STORAGE_KEY);
+		} catch {
+			// ignore
+		}
+	}
+
+	function resetControlsToDefaults(p) {
+		if (!p?.defaults) return;
+		p.current = JSON.parse(JSON.stringify(p.defaults));
+	}
+
+	function syncSelectsFromCurrent(controls, uiDefs, p) {
+		for (const def of uiDefs) {
+			const key = def.key;
+			const select = controls[key];
+			if (!(select instanceof HTMLSelectElement)) continue;
+			const currentValue = p.current[key];
+			if (def.kind === "palette") {
+				setSelectValue(select, currentValue || "(random)");
+			} else if (currentValue !== undefined) {
+				setSelectValue(select, currentValue);
+			}
+		}
 	}
 
 	function setStatus(isWorking) {
@@ -335,6 +392,9 @@
 		frame.classList.toggle("presentation", shouldPresent);
 		canvas.classList.toggle("horizontal", horizontal);
 		frame.classList.toggle("horizontal", horizontal);
+		if (typeof fitDisplayToViewport === "function") {
+			fitDisplayToViewport();
+		}
 	}
 
 	function renderDashboard(paletteCurrentKey, presentationCurrentKey) {
@@ -369,6 +429,11 @@
 		const storageKey = config.storageKey || "fx_longform2:userPalettes";
 		const p = getParams();
 		if (!p) return;
+
+		if (loadPersistedControls(p)) {
+			if (typeof root.resolveParams === "function") root.resolveParams();
+			console.log("[ParamsPanel] restored controls from localStorage");
+		}
 
 		const toggle = document.querySelector(".info-toggle");
 		const container = document.querySelector(".container");
@@ -449,6 +514,7 @@
 				p.current[presentationCurrentKey] = selPresentation.value;
 				applyPresentation(p.current[presentationCurrentKey]);
 				renderDashboard(paletteCurrentKey, presentationCurrentKey);
+				savePersistedControls(p);
 			});
 		}
 
@@ -497,6 +563,7 @@
 				}
 
 				if (typeof root.resolveParams === "function") root.resolveParams();
+				savePersistedControls(p);
 
 				if (features.presentation) {
 					applyPresentation(p.current[presentationCurrentKey]);
@@ -525,6 +592,23 @@
 				} else {
 					setText(".kb-params.dashboard", "download not ready");
 				}
+			});
+		}
+
+		const clearStorage = document.getElementById("param-clear-storage");
+		if (clearStorage) {
+			clearStorage.addEventListener("change", () => {
+				if (!clearStorage.checked) return;
+				clearPersistedControls();
+				resetControlsToDefaults(p);
+				if (typeof root.resolveParams === "function") root.resolveParams();
+				syncSelectsFromCurrent(controls, uiDefs, p);
+				if (features.presentation) {
+					applyPresentation(p.current[presentationCurrentKey]);
+				}
+				renderDashboard(paletteCurrentKey, presentationCurrentKey);
+				clearStorage.checked = false;
+				console.log("[ParamsPanel] cleared saved controls and restored defaults");
 			});
 		}
 

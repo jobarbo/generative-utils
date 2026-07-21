@@ -147,7 +147,7 @@ let noiseCanvasHeight = 1;
 					Promise.resolve(prevLoadBytes.apply(this, args)).then((result) => {
 						obj.bytes = result;
 						return result;
-					})
+					}),
 				);
 				return obj;
 			};
@@ -613,6 +613,67 @@ function resolveSaveCanvas() {
 	return p5Canvases[0] || document.querySelector("canvas");
 }
 
+/**
+ * Mount the display canvas in main.main and publish logical aspect as CSS
+ * variables so style.css can contain-fit to the viewport.
+ * Uses logical size (p5 width/height), NOT bitmap size — so pixelDensity
+ * does not affect on-screen layout; export still uses the full buffer.
+ */
+function fitDisplayToViewport() {
+	const canvasEl = resolveSaveCanvas();
+	if (!(canvasEl instanceof HTMLCanvasElement)) return;
+
+	const mainEl = document.querySelector("main.main");
+	if (mainEl && canvasEl.parentElement !== mainEl) {
+		const frame = mainEl.querySelector(".frame");
+		if (frame && frame.nextSibling) {
+			mainEl.insertBefore(canvasEl, frame.nextSibling);
+		} else {
+			mainEl.appendChild(canvasEl);
+		}
+	}
+
+	// Logical artwork size (ignore pixelDensity / backing-store scale)
+	let logicalW = typeof width === "number" && width > 0 ? width : 0;
+	let logicalH = typeof height === "number" && height > 0 ? height : 0;
+	if (!logicalW || !logicalH) {
+		const density =
+			(typeof pixelDensity === "function" ? pixelDensity() : null) ||
+			(typeof pixel_density === "number" ? pixel_density : 1) ||
+			1;
+		logicalW = (canvasEl.width || 1) / Math.max(1, density);
+		logicalH = (canvasEl.height || 1) / Math.max(1, density);
+	}
+
+	const root = document.documentElement;
+	root.style.setProperty("--art-w", String(logicalW));
+	root.style.setProperty("--art-h", String(logicalH));
+
+	// Drop any previous JS pixel sizing — CSS owns display size
+	canvasEl.style.removeProperty("width");
+	canvasEl.style.removeProperty("height");
+	canvasEl.style.removeProperty("max-width");
+	canvasEl.style.removeProperty("max-height");
+	if (mainEl) {
+		mainEl.style.removeProperty("width");
+		mainEl.style.removeProperty("height");
+	}
+
+	if (typeof updateDebugOverlay === "function" && typeof debugBounds !== "undefined") {
+		try {
+			const padding =
+				typeof CANVAS_CONFIG !== "undefined" ? CANVAS_CONFIG.ARTWORK_PADDING : typeof BASE_PADDING !== "undefined" ? BASE_PADDING : 0.1;
+			updateDebugOverlay({
+				debugBounds: !!debugBounds,
+				padding,
+				movers: typeof movers !== "undefined" ? movers : [],
+			});
+		} catch {
+			// ignore
+		}
+	}
+}
+
 // make a function to save the canvas as a png file with the git branch name and a timestamp
 function saveArtwork() {
 	const logger = window.Logger || console;
@@ -1074,14 +1135,7 @@ function setupControls({showFps = false, showDownload = false, checkShaders = ()
  * @param {number} [opts.padding] - normalized artwork padding (0–1)
  * @param {Array} [opts.movers] - movers with minBoundX/Y maxBoundX/Y
  */
-function updateDebugOverlay({
-	debugBounds = false,
-	padding = 0.1,
-	movers = [],
-	overlayId = "debug-bounds",
-	basePaddingId = "debug-base-padding",
-	moverBoundsId = "debug-mover-bounds",
-} = {}) {
+function updateDebugOverlay({debugBounds = false, padding = 0.1, movers = [], overlayId = "debug-bounds", basePaddingId = "debug-base-padding", moverBoundsId = "debug-mover-bounds"} = {}) {
 	const debugOverlay = document.getElementById(overlayId);
 	const basePaddingEl = document.getElementById(basePaddingId);
 	const moverBoundsEl = document.getElementById(moverBoundsId);

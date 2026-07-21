@@ -20,6 +20,7 @@ class ShaderEffectsPanel {
 		this._editing = false; // pause external value sync while dragging sliders
 		this._dragName = null;
 		this._sizeDirty = false; // user edited size fields — don't overwrite until Apply
+		this._saveTimer = null;
 	}
 
 	/**
@@ -117,6 +118,10 @@ class ShaderEffectsPanel {
 			<div class="shader-effects-panel__footer" data-ref="footer">
 				<select class="shader-effects-panel__template" data-ref="template" title="Effect type"></select>
 				<button type="button" class="shader-effects-panel__add" data-ref="add" title="Add effect">+</button>
+				<label class="shader-effects-panel__clear" title="Clear saved shader settings from localStorage and restore defaults">
+					<input type="checkbox" data-ref="clear-storage" />
+					<span>Clear saved</span>
+				</label>
 			</div>
 		`;
 
@@ -125,6 +130,7 @@ class ShaderEffectsPanel {
 		this.listEl = panel.querySelector("[data-ref='list']");
 		this.templateSelect = panel.querySelector("[data-ref='template']");
 		this.addBtn = panel.querySelector("[data-ref='add']");
+		this.clearStorageCheckbox = panel.querySelector("[data-ref='clear-storage']");
 		this.outputRefs = {
 			fit: panel.querySelector("[data-ref='fit-canvas']"),
 			crisp: panel.querySelector("[data-ref='crisp']"),
@@ -139,6 +145,7 @@ class ShaderEffectsPanel {
 		panel.addEventListener("keydown", (e) => e.stopPropagation());
 		this._bindListDnD();
 		this._bindAddFooter();
+		this._bindClearStorageCheckbox();
 		this._bindOutputControls();
 		this._syncOutputControls();
 	}
@@ -171,6 +178,7 @@ class ShaderEffectsPanel {
 			});
 			this._updateRatioPresetMatch();
 			this._setRatioFieldsEnabled(!r.fit.checked);
+			this._scheduleSave();
 		};
 
 		r.fit.addEventListener("change", commitRatio);
@@ -178,6 +186,7 @@ class ShaderEffectsPanel {
 			r.crisp.addEventListener("change", () => {
 				if (typeof this.shaderEffects?.setCrispPixels === "function") {
 					this.shaderEffects.setCrispPixels(r.crisp.checked);
+					this._scheduleSave();
 				}
 			});
 		}
@@ -391,6 +400,7 @@ class ShaderEffectsPanel {
 			this.shaderEffects.reorderEffects(order);
 		}
 		console.log("[shaderEffectsPanel] order:", order.join(" → "));
+		this._scheduleSave();
 	}
 
 	_rebuildDrawers() {
@@ -448,6 +458,7 @@ class ShaderEffectsPanel {
 		toggle.addEventListener("change", () => {
 			this.shaderEffects.setEffectEnabled(effectName, toggle.checked);
 			drawer.classList.toggle("is-enabled", toggle.checked);
+			this._scheduleSave();
 		});
 
 		const label = document.createElement("span");
@@ -528,6 +539,7 @@ class ShaderEffectsPanel {
 
 		this._rebuildDrawers();
 		this._restoreOpenDrawers(openNames, newName);
+		this._scheduleSave();
 	}
 
 	_createEffect(templateName) {
@@ -542,6 +554,7 @@ class ShaderEffectsPanel {
 
 		this._rebuildDrawers();
 		this._restoreOpenDrawers(openNames, newName);
+		this._scheduleSave();
 	}
 
 	_removeEffect(effectName) {
@@ -555,6 +568,7 @@ class ShaderEffectsPanel {
 		this.shaderEffects.removeEffect(effectName);
 		this._rebuildDrawers();
 		this._restoreOpenDrawers(openNames);
+		this._scheduleSave();
 	}
 
 	_openDrawerNames() {
@@ -971,6 +985,47 @@ class ShaderEffectsPanel {
 		} else {
 			this.shaderEffects.updateEffectParam(effectName, key, num);
 		}
+		this._scheduleSave();
+	}
+
+	_persistEnabled() {
+		return typeof PERSIST_SHADER_PANEL === "undefined" || !!PERSIST_SHADER_PANEL;
+	}
+
+	_scheduleSave() {
+		if (!this._persistEnabled() || !this.shaderEffects?.savePersistedPanelConfig) return;
+		if (this._saveTimer) clearTimeout(this._saveTimer);
+		this._saveTimer = setTimeout(() => {
+			this._saveTimer = null;
+			this.shaderEffects.savePersistedPanelConfig();
+		}, 400);
+	}
+
+	_bindClearStorageCheckbox() {
+		if (!this.clearStorageCheckbox || this.clearStorageCheckbox.dataset.bound) return;
+		this.clearStorageCheckbox.dataset.bound = "1";
+		this.clearStorageCheckbox.addEventListener("change", () => {
+			if (!this.clearStorageCheckbox.checked) return;
+			this._resetPersistedConfig();
+			this.clearStorageCheckbox.checked = false;
+		});
+	}
+
+	_resetPersistedConfig() {
+		if (!this.shaderEffects) return;
+		if (this._saveTimer) {
+			clearTimeout(this._saveTimer);
+			this._saveTimer = null;
+		}
+		if (typeof this.shaderEffects.clearPersistedPanelConfig === "function") {
+			this.shaderEffects.clearPersistedPanelConfig();
+		}
+		if (typeof this.shaderEffects.resetToDefaultPanelConfig === "function") {
+			this.shaderEffects.resetToDefaultPanelConfig();
+		}
+		this._rebuildDrawers();
+		this._syncOutputControls();
+		console.log("[shaderEffectsPanel] cleared saved shaders and restored defaults");
 	}
 
 	syncFromConfig() {

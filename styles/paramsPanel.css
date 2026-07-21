@@ -51,8 +51,9 @@ span.frame.presentation.horizontal {
 }
 
 canvas.p5Canvas.presentation {
-	max-height: 85vh;
-	max-width: 85vw;
+	width: min(85vw, calc(85vh * var(--art-w) / var(--art-h))) !important;
+	max-width: 85vw !important;
+	max-height: 85vh !important;
 	box-shadow:
 		2.8px 2.8px 2.2px rgba(0, 0, 0, 0.05),
 		6.7px 6.7px 5.3px rgba(0, 0, 0, 0.065),
@@ -65,8 +66,9 @@ canvas.p5Canvas.presentation {
 
 canvas.p5Canvas.presentation.horizontal {
 	transform: rotate(90deg);
-	max-width: 85vh;
-	max-height: 85vw;
+	width: min(85vh, calc(85vw * var(--art-w) / var(--art-h))) !important;
+	max-width: 85vh !important;
+	max-height: 85vw !important;
 }
 
 /* ---- Slide-out panel chrome ---- */
@@ -276,6 +278,25 @@ canvas.p5Canvas.presentation.horizontal {
 	justify-content: center;
 	align-items: center;
 	margin-top: clamp(8px, 0.66vw, 14px);
+	gap: 8px;
+}
+
+.persist-clear {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 4px;
+	font-family: helvetica, arial, sans-serif;
+	font-size: clamp(8px, 0.66vw, 14px);
+	color: var(--color-text);
+	opacity: 0.75;
+	cursor: pointer;
+	user-select: none;
+}
+
+.persist-clear input {
+	margin: 0;
+	cursor: pointer;
 }
 
 .button {
