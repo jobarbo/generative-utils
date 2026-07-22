@@ -643,7 +643,7 @@ class ShaderEffectsPanel {
 			// —— Discrete counts ——
 			samplecount: {min: 1, max: 64, step: 1, integer: true},
 			levels: {min: 2, max: 256, step: 1, integer: true},
-			octave: {min: 1, max: 36, step: 1, integer: true},
+			octave: {min: 1, max: 8, step: 1, integer: true},
 			blurquality: {min: 1, max: 128, step: 1, integer: true},
 
 			// —— Degrees / angles ——
@@ -653,7 +653,7 @@ class ShaderEffectsPanel {
 
 			// —— Known units ——
 			gridsize: {min: 1, max: 1440, step: 1, integer: true},
-			sortamount: {min: 0, max: 120, step: 0.1},
+			sortamount: {min: 0, max: 18, step: 0.1},
 			translationspeedx: {min: 0, max: 5, step: 0.01},
 			translationspeedy: {min: 0, max: 5, step: 0.01},
 			spiralamount: {min: 0, max: 3, step: 0.01},
