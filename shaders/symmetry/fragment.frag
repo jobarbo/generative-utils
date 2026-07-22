@@ -229,8 +229,9 @@ void main() {
 			float fbmY = fbm(vec2(uTranslationPhaseY, 100.0), uTranslationPhaseY) * 2.0 - 1.0;
 			offset = vec2(fbmX, fbmY) * moveAmount;
 		} else if (transMode == 3) {
-			vec2 vf = vectorField(vec2(0.5), uTranslationPhaseX);
-			offset = vf * moveAmount;
+			vec2 vfX = vectorField(vec2(0.5), uTranslationPhaseX);
+			vec2 vfY = vectorField(vec2(0.5, 0.6), uTranslationPhaseY);
+			offset = vec2(vfX.x, vfY.y) * moveAmount;
 		} else if (transMode == 4) {
 			// Continuous scroll: phase advances one way; mirrorRepeat wraps UV so it loops
 			// seamlessly (no back-and-forth). Speed X/Y control scroll rate per axis.
