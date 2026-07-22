@@ -26,6 +26,48 @@ class AudioKnob {
 		// Returns 1.0 when beat detected, decays to 0 each frame
 		this.beatPulse = 0;
 		this.beatPulseDecay = 0.85;
+
+		// Params the user has manually "taken control" of from the panel — skipped in update()
+		// until released. Keyed by "effectName.paramName".
+		this.overrides = new Set();
+	}
+
+	_key(effectName, paramName) {
+		return `${effectName}.${paramName}`;
+	}
+
+	/**
+	 * Find the mapping (if any) driving effectName.paramName.
+	 * @returns {object|null}
+	 */
+	getMapping(effectName, paramName) {
+		return this.mappings.find((m) => m.effectName === effectName && m.paramName === paramName) || null;
+	}
+
+	/**
+	 * Is this param currently audio-driven (mapped and not overridden)?
+	 */
+	isLive(effectName, paramName) {
+		return !this.overrides.has(this._key(effectName, paramName)) && !!this.getMapping(effectName, paramName);
+	}
+
+	/**
+	 * Take manual control of a mapped param — update() will stop writing to it
+	 * until releaseParam() is called.
+	 * @returns {AudioKnob} this (for chaining)
+	 */
+	overrideParam(effectName, paramName) {
+		this.overrides.add(this._key(effectName, paramName));
+		return this;
+	}
+
+	/**
+	 * Give control of a param back to its audio mapping.
+	 * @returns {AudioKnob} this (for chaining)
+	 */
+	releaseParam(effectName, paramName) {
+		this.overrides.delete(this._key(effectName, paramName));
+		return this;
 	}
 
 	/**
@@ -112,11 +154,6 @@ class AudioKnob {
 			return;
 		}
 
-		// Pause driving uniforms while the shader effects panel is open so sliders can stick
-		if (typeof shaderEffectsPanel !== "undefined" && shaderEffectsPanel.visible) {
-			return;
-		}
-
 		// No live signal (mic locked, denied, or silent) — don't drive params,
 		// otherwise hand-set panel values get mapped back to outMin every frame
 		if (typeof audioAnalyzer.getSourceStatus === "function" && !audioAnalyzer.getSourceStatus().receiving) {
@@ -131,6 +168,8 @@ class AudioKnob {
 		}
 
 		for (const m of this.mappings) {
+			if (this.overrides.has(this._key(m.effectName, m.paramName))) continue;
+
 			let audioValue = this._getAudioValue(m.audioFeature);
 			const inLo = m.inMin ?? 0;
 			const inHi = m.inMax ?? 1;

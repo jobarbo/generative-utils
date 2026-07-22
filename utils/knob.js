@@ -4,8 +4,39 @@ let knob = Array(19).fill(0);
 // Each entry: { current, target, speed, effect, param }
 const knobSmoothing = {};
 
+/**
+ * Registry of MIDI-driven shader params, mirroring audioKnob's live/override
+ * interface so shaderEffectsPanel can show a "live" indicator and let the
+ * user take manual control from the panel.
+ */
+const midiLiveControl = {
+	mappings: new Map(), // "effect.param" -> {effectName, paramName, label}
+	overrides: new Set(),
+	_key(effectName, paramName) {
+		return `${effectName}.${paramName}`;
+	},
+	register(effectName, paramName, label) {
+		this.mappings.set(this._key(effectName, paramName), {effectName, paramName, label});
+	},
+	getMapping(effectName, paramName) {
+		return this.mappings.get(this._key(effectName, paramName)) || null;
+	},
+	isLive(effectName, paramName) {
+		return !this.overrides.has(this._key(effectName, paramName)) && this.mappings.has(this._key(effectName, paramName));
+	},
+	overrideParam(effectName, paramName) {
+		this.overrides.add(this._key(effectName, paramName));
+		return this;
+	},
+	releaseParam(effectName, paramName) {
+		this.overrides.delete(this._key(effectName, paramName));
+		return this;
+	},
+};
+
 function addKnobSmooth(controller, effect, param, initial = 0, speed = 0.08) {
 	knobSmoothing[controller] = {current: initial, target: initial, speed, effect, param};
+	midiLiveControl.register(effect, param, `MIDI CC${controller}`);
 }
 
 function updateKnobSmoothing() {
@@ -13,6 +44,7 @@ function updateKnobSmoothing() {
 		const s = knobSmoothing[ctrl];
 		if (Math.abs(s.target - s.current) < 0.0001) continue;
 		s.current += (s.target - s.current) * s.speed;
+		if (midiLiveControl.overrides.has(midiLiveControl._key(s.effect, s.param))) continue;
 		if (typeof shaderEffects !== "undefined") {
 			shaderEffects.updateEffectParam(s.effect, s.param, s.current);
 		}
@@ -65,59 +97,48 @@ if (navigator.requestMIDIAccess) {
 					}
 				}
 
+				const setLive = (effectName, paramName, value) => {
+					midiLiveControl.register(effectName, paramName, `MIDI CC${controller}`);
+					if (midiLiveControl.overrides.has(midiLiveControl._key(effectName, paramName))) return;
+					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
+						shaderEffects.updateEffectParam(effectName, paramName, value);
+					}
+				};
+
 				if (controller === 33) {
 					const angle = map(value, 0, 127, 0, 1, true);
-					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-						shaderEffects.updateEffectParam("pixelSort", "invert", angle);
-					}
+					setLive("pixelSort", "invert", angle);
 				}
 
 				if (controller === 34) {
 					const angle = map(value, 0, 127, 0, 1, true);
-					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-						console.log("threshold", angle);
-						shaderEffects.updateEffectParam("pixelSort", "threshold", angle);
-					}
+					setLive("pixelSort", "threshold", angle);
 				}
 
 				if (controller === 35) {
 					const angle = map(value, 0, 127, 0, 10, true);
-					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-						shaderEffects.updateEffectParam("pixelSort", "sortAmount", angle);
-					}
+					setLive("pixelSort", "sortAmount", angle);
 				}
 
 				if (controller === 36) {
 					const angle = int(map(value, 0, 127, 1, 64, true));
-					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-						console.log("sampleCount", angle);
-						shaderEffects.updateEffectParam("pixelSort", "sampleCount", angle);
-					}
+					setLive("pixelSort", "sampleCount", angle);
 				}
 
 				if (controller === 37) {
 					const angle = map(value, 0, 127, 0.1, 5, true);
-					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-						console.log("translationSpeedX/Y", angle);
-						shaderEffects.updateEffectParam("symmetry", "translationSpeedX", angle);
-						shaderEffects.updateEffectParam("symmetry", "translationSpeedY", angle);
-					}
+					setLive("symmetry", "translationSpeedX", angle);
+					setLive("symmetry", "translationSpeedY", angle);
 				}
 
 				if (controller === 38) {
 					const angle = map(value, 0, 127, 0.1, 150, true);
-					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-						console.log("rotationSpeed", angle);
-						shaderEffects.updateEffectParam("symmetry", "rotationSpeed", angle);
-					}
+					setLive("symmetry", "rotationSpeed", angle);
 				}
 
 				if (controller === 39) {
 					const timeMultiplier = map(value, 0, 127, 0.0001, 0.1, true);
-					if (typeof shaderEffects !== "undefined" && typeof shaderEffects.updateEffectParam === "function") {
-						console.log("timeMultiplier", timeMultiplier);
-						shaderEffects.updateEffectParam("symmetry", "timeMultiplier", timeMultiplier);
-					}
+					setLive("symmetry", "timeMultiplier", timeMultiplier);
 				}
 			}
 		};

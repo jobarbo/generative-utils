@@ -1114,6 +1114,20 @@ class ShaderEffectsPanel {
 		const nameEl = document.createElement("span");
 		nameEl.textContent = labelText;
 
+		let liveDot = null;
+		if (componentIndex == null) {
+			liveDot = document.createElement("button");
+			liveDot.type = "button";
+			liveDot.hidden = true;
+			liveDot.style.cssText =
+				"border:none;background:none;padding:0 4px;margin-right:4px;cursor:pointer;font-size:9px;line-height:1;vertical-align:middle;";
+			liveDot.addEventListener("click", (e) => {
+				e.stopPropagation();
+				this._toggleLiveOverride(effectName, key);
+				this._refreshLiveIndicator(effectName, key, control);
+			});
+		}
+
 		const numberInput = document.createElement("input");
 		numberInput.type = "number";
 		numberInput.className = "shader-effects-panel__number";
@@ -1124,6 +1138,7 @@ class ShaderEffectsPanel {
 		numberInput.title = range.integer ? "Integer only" : "Type a value";
 		if (range.integer) numberInput.dataset.integer = "1";
 
+		if (liveDot) meta.appendChild(liveDot);
 		meta.appendChild(nameEl);
 		meta.appendChild(numberInput);
 
@@ -1212,7 +1227,68 @@ class ShaderEffectsPanel {
 		root.appendChild(meta);
 		root.appendChild(slider);
 
-		return {root, input: slider, numberInput, key, componentIndex, integer: !!range.integer};
+		const control = {root, input: slider, numberInput, liveDot, key, componentIndex, integer: !!range.integer};
+		this._refreshLiveIndicator(effectName, key, control);
+		return control;
+	}
+
+	/**
+	 * Find the live (audio/MIDI) source currently driving effectName.paramName, if any.
+	 * Recognizes any global exposing the audioKnob/midiLiveControl-shaped interface:
+	 * getMapping(effect, param), overrides:Set, overrideParam(), releaseParam().
+	 */
+	_getLiveSource(effectName, paramName) {
+		const registries = [
+			typeof audioKnob !== "undefined" ? {reg: audioKnob, source: "audio"} : null,
+			typeof midiLiveControl !== "undefined" ? {reg: midiLiveControl, source: "midi"} : null,
+		].filter(Boolean);
+
+		for (const {reg, source} of registries) {
+			const mapping = reg.getMapping?.(effectName, paramName);
+			if (!mapping) continue;
+			const key = `${effectName}.${paramName}`;
+			return {
+				source,
+				label: mapping.audioFeature || mapping.label || source,
+				isOverridden: reg.overrides.has(key),
+				override: () => reg.overrideParam(effectName, paramName),
+				release: () => reg.releaseParam(effectName, paramName),
+			};
+		}
+		return null;
+	}
+
+	_toggleLiveOverride(effectName, paramName) {
+		const live = this._getLiveSource(effectName, paramName);
+		if (!live) return;
+		if (live.isOverridden) live.release();
+		else live.override();
+	}
+
+	/**
+	 * Show/hide the live-control dot and lock/unlock the control's inputs accordingly.
+	 * Call on creation and every frame (syncFromConfig) so panel reflects override changes.
+	 */
+	_refreshLiveIndicator(effectName, paramName, control) {
+		if (!control?.liveDot) return;
+		const {liveDot, input, numberInput} = control;
+		const live = this._getLiveSource(effectName, paramName);
+
+		if (!live) {
+			liveDot.hidden = true;
+			input.disabled = false;
+			if (numberInput) numberInput.disabled = false;
+			return;
+		}
+
+		liveDot.hidden = false;
+		liveDot.textContent = live.isOverridden ? "●" : "◉";
+		liveDot.title = live.isOverridden
+			? `Manual override (was ${live.source}: ${live.label}) — click to give control back`
+			: `Live: ${live.source} — ${live.label}. Click to take control.`;
+		liveDot.style.color = live.isOverridden ? "#888" : "#4ade80";
+		input.disabled = !live.isOverridden;
+		if (numberInput) numberInput.disabled = !live.isOverridden;
 	}
 
 	_formatValue(num) {
@@ -1297,6 +1373,8 @@ class ShaderEffectsPanel {
 			}
 
 			for (const [, control] of drawer.inputs) {
+				if (control.liveDot) this._refreshLiveIndicator(effectName, control.key, control);
+
 				let value;
 				if (control.componentIndex != null) {
 					value = effect[control.key]?.[control.componentIndex];
