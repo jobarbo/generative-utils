@@ -157,12 +157,14 @@ class ShaderManager {
 
 	/**
 	 * Whether the texture source needs a Y flip when drawn via drawFullscreenQuad.
-	 * p5.Graphics / 2D canvases: flip. p5.Framebuffer ping-pong buffers: don't flip.
+	 * p5 2.3+ uploads 2D Graphics upright — do not flip them.
+	 * Ping-pong framebuffers are stored upright via writesToFramebuffer in renderPass(),
+	 * so sampling them also needs no flip.
 	 * @param {*} texture
 	 * @returns {boolean}
 	 */
 	shouldFlipTextureSource(texture) {
-		return !this.isFramebufferSource(texture);
+		return false;
 	}
 
 	/**
