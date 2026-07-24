@@ -215,7 +215,10 @@
 		function updatePreview() {
 			const manager = root.paletteManager;
 			if (!manager || !(selPalette instanceof HTMLSelectElement)) return;
-			const name = selPalette.value === "(random)" ? p.current[paletteCurrentKey] : selPalette.value;
+			const name =
+				selPalette.value === "(random)"
+					? p.current[paletteCurrentKey] || (typeof currentPaletteName === "string" ? currentPaletteName : "")
+					: selPalette.value;
 			const hexes = name ? manager.getHexPalette(name) : null;
 			if (!hexes || hexes.length === 0) {
 				palettePreview.style.background = "";
@@ -626,11 +629,12 @@
 			for (const name of localPaletteNames) ensureOption(selPalette, name, `${name} (local)`);
 			ensureOption(selPalette, "(random)", "(random)");
 
-			const target = selected || p.current[paletteCurrentKey];
-			if (target) {
-				setSelectValue(selPalette, target);
-			} else if (filePaletteNames.length > 0) {
-				setSelectValue(selPalette, filePaletteNames[0]);
+			// "" / missing = keep "(random)" preference (don't snap to first file palette)
+			const preference = selected !== undefined && selected !== null ? selected : p.current[paletteCurrentKey];
+			if (preference) {
+				setSelectValue(selPalette, preference);
+			} else {
+				setSelectValue(selPalette, "(random)");
 			}
 			paletteCreator?.updatePreview();
 		}

@@ -18,6 +18,11 @@ uniform float uPulseSpeed; // pulse rate (legacy ≈ 1.7)
 uniform float uWaveAmount; // cartesian ripple amplitude (legacy ≈ 0.00001 — nearly off)
 uniform float uWaveFrequency; // cartesian ripple frequency (legacy ≈ 1.0)
 
+// Mirror-wrap UVs so displacement outside [0,1] reflects content instead of edge smear / flat color
+vec2 mirrorRepeat(vec2 u) {
+	return 1.0 - abs(fract(u) * 2.0 - 1.0);
+}
+
 void main() {
 	// UV orientation is corrected in shaderManager.renderPass / drawFullscreenQuad
 	vec2 uv = vTexCoord;
@@ -54,8 +59,8 @@ void main() {
 
 	centered_uv += waveOffset + spiralOffset;
 
-	// Convert back to texture space
-	uv = clamp((centered_uv + 1.0) * 0.5, 0.0, 1.0);
+	// Convert back to texture space and mirror-wrap out-of-bounds samples
+	uv = mirrorRepeat(centered_uv * 0.5 + uCenter);
 
 	vec4 warpedColor = texture2D(uTexture, uv);
 	vec4 originalColor = texture2D(uTexture, originalUV);
