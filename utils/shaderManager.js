@@ -126,6 +126,12 @@ class ShaderManager {
 
 		// Set uniforms
 		for (const [key, value] of Object.entries(uniforms)) {
+			if (value === undefined || value === null) {
+				if (key === "uRgbGain") {
+					shader.setUniform(key, [1.0, 1.0, 1.0]);
+				}
+				continue;
+			}
 			shader.setUniform(key, value);
 			// After binding a sampler, force nearest filtering for crisp low-res look
 			if (this.crispPixels && this._looksLikeTexture(value)) {

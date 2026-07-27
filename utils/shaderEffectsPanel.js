@@ -652,6 +652,8 @@ class ShaderEffectsPanel {
 			blurdirection: {min: 0, max: Math.PI * 2, step: 0.01},
 
 			// —— Known units ——
+			lineDensity: {min: 1, max: 1000, step: 1, integer: true},
+			dotradius: {min: 0, max: 1, step: 0.01},
 			gridsize: {min: 1, max: 1440, step: 1, integer: true},
 			sortamount: {min: 0, max: 18, step: 0.1},
 			translationspeedx: {min: 0, max: 5, step: 0.01},
@@ -735,7 +737,7 @@ class ShaderEffectsPanel {
 		}
 
 		if (k === "warpamount" || k.includes("intensity") || k.includes("density")) {
-			return {min: 0, max: Math.max(1, v * 2 || 1), step: v > 10 ? 0.1 : 0.01, integer: false};
+			return {min: 0, max: Math.max(1, v * 10 || 1), step: v > 10 ? 0.1 : 0.01, integer: false};
 		}
 
 		if (k.includes("brightness") || k.includes("gain") || k.includes("scale")) {

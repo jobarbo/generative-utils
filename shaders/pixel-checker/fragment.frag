@@ -8,6 +8,7 @@ uniform float uBrightness; // Brightness boost
 uniform float uCellSize; // Size of CRT cells (pixels)
 uniform float uGapOpacity; // Gap opacity between phosphor dots (0.0 = no gaps, 1.0 = full dark gaps)
 uniform float uRgbOpacity; // RGB color separation opacity (0.0 = no separation, 1.0 = full isolation)
+uniform vec3 uRgbGain; // Per-channel multiplier after CRT (default 1,1,1)
 uniform float uDotRadius; // Size of phosphor dots (0.0-0.5)
 uniform float uDotFalloff; // Softness of phosphor dot edges (0.0-1.0)
 uniform float uFilterMode; // Display mode: 0.0 = true pixel (sample at cell center), 1.0 = filter overlay (sample at actual position)
@@ -118,6 +119,13 @@ void main() {
 
 	// Apply brightness boost
 	crtColor *= (1.0 + uBrightness);
+
+	// Per-channel gain (unset WebGL uniforms default to 0 — treat all-zero as neutral)
+	vec3 gain = uRgbGain;
+	if (dot(gain, gain) < 1e-8) {
+		gain = vec3(1.0);
+	}
+	crtColor *= gain;
 
 	gl_FragColor = vec4(crtColor, cellColor.a);
 }

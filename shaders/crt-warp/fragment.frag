@@ -74,9 +74,14 @@ void main() {
 		vec2 vignetteUV = uv * 2.0 - 1.0;
 		float vignette = 1.0 - dot(vignetteUV, vignetteUV) * uVignette * 0.5;
 		vignette = clamp(vignette, 0.0, 1.0);
-		color.rgb *= vignette;
+			color.rgb *= vignette;
 	}
 
-	color.rgb *= uRgbGain;
+	// Unset vec3 uniforms default to 0 in WebGL — treat all-zero as neutral
+	vec3 gain = uRgbGain;
+	if (dot(gain, gain) < 1e-8) {
+		gain = vec3(1.0);
+	}
+	color.rgb *= gain;
 	gl_FragColor = color;
 }
