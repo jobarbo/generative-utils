@@ -84,9 +84,10 @@ vec2 vectorField(vec2 pos, float time) {
 	return direction * magnitude;
 }
 
-// Mirror repeat: map to [0,1] by flipping every other tile (normal | flipped | normal | ...), seamless on both axes
+// Mirror repeat: map to [0,1] by flipping every other tile (normal | flipped | normal | ...), seamless on both axes.
+// Period is 2 so that u in [0,1] stays identity (no rescale); [1,2] is the flipped tile.
 vec2 mirrorRepeat(vec2 u) {
-	return 1.0 - abs(fract(u) * 2.0 - 1.0);
+	return 1.0 - abs(mod(u, 2.0) - 1.0);
 }
 
 // Horizontal symmetry: mirror across horizontal center line (top half reflects to bottom)
