@@ -53,6 +53,12 @@ block, which keeps the boundary function monotone — so "which block am I in" i
 by testing four candidates rather than searching, and every pixel of a span agrees.
 `spanJitter` scales that irregularity (0 = regular grid).
 
+`spanJitter` only moves whole lines within a hash band, so on its own the seams still read
+as straight segments. `edgeWobble` shifts a line's entire boundary set by a continuous FBM
+of the perpendicular coordinate, so neighbouring lines cut at slightly different places
+and the seam becomes a curve. A uniform shift per line keeps the boundaries monotone and
+constant along the axis, so the permutation is untouched.
+
 `center` is where that lattice is anchored: block boundaries and the per-line fields are
 measured from it, so changing `angle` pivots the whole structure around that point rather
 than around the texture corner. Its offset along the sort axis is snapped to a whole
@@ -64,6 +70,22 @@ For the same reason, **anything animating the threshold must be constant along t
 axis**. The global pulse depends on time only, and the sweep depends only on the
 coordinate *perpendicular* to the sort axis. A radial sweep would vary along a span and
 shred the permutation — hence the perpendicular-only sweep modes.
+
+### Mixing axes
+
+The four axis checkboxes combine freely. With exactly one ticked the axis is a constant
+and the region lookup is skipped entirely. With several, the image is diced into cells of
+a hashed grid (`axisRegionScale`) and each cell draws one of the enabled axes. Spans are
+cut wherever the axis changes, so a span never leaves its region and the whole thing stays
+a bijection — and neighbouring cells that happen to draw the same axis simply merge, which
+is why the patches do not read as a grid.
+
+`angle` is now an extra rotation applied on top of whichever axis a region picked, so it
+tilts the entire arrangement without breaking the combination.
+
+The diagonal axes step by `sqrt(2)` so they land back on whole pixels, but a diagonal
+lattice still maps several pixels to the same index — diagonal regions are a chunky
+approximation, not a strict permutation. Vertical and horizontal are exact.
 
 ### Organic variation
 
@@ -77,10 +99,14 @@ without breaking the permutation. At 0 the shader is strictly uniform; at 1 each
 - its own **animation phase**, so lines stop pulsing in lockstep — this is most of the
   "the whole image breathes as one block" feeling.
 
-The first two come from a 4-octave FBM of the perpendicular coordinate, drifting at
-`organicSpeed`; the third from a per-line hash. `organicScale` sets how wide the coherent
-bands are — low values give broad regions that share a character, high values give
-line-to-line churn.
+The first two come from a 4-octave FBM of the perpendicular coordinate; the third from a
+per-line hash. `organicScale` sets how wide the coherent bands are — low values give broad
+regions that share a character, high values give line-to-line churn.
+
+`organicSpeed` makes that FBM drift, which moves the seams sideways over time. It is an
+**animation** knob and defaults to 0 — with every `animate*` box unticked and no sweep,
+the output is bit-identical frame to frame. Raise it only when you want the structure
+itself to crawl.
 
 ## Uniforms
 
@@ -88,7 +114,9 @@ line-to-line churn.
 |---|---|---|
 | `uTexture`, `uResolution` | — | source + physical resolution |
 | `uTime` | `timeMultiplier` | fed by `_phase`, an accumulated clock — changing the speed does not jump |
-| `uAngle` | `angle` | `0` = sort columns, `PI/2` = sort rows |
+| `uAxisVertical` … `uAxisAntiDiagonal` | `axisVertical`, `axisHorizontal`, `axisDiagonal`, `axisAntiDiagonal` | checkboxes, any combination |
+| `uAxisRegionScale` | `axisRegionScale` | patch size when several axes are on |
+| `uAngle` | `angle` | extra rotation applied on top of the chosen axis |
 | `uCenter` | `center` | pivot the axis turns around, normalised 0–1 |
 | `uSortKey`, `uGateKey` | `sortKey`, `gateKey` | 0 luma, 1 hue, 2 saturation, 3 lightness, 4 R, 5 G, 6 B |
 | `uThresholdLow`, `uThresholdHigh` | `thresholdLow`, `thresholdHigh` | band; generalises Asendorf's black / brightness / white modes |
@@ -97,6 +125,7 @@ line-to-line churn.
 | `uMaxSpan` | `maxSpan` | nominal span length in pixels, capped at 64 steps |
 | `uSpanStep` | `spanStep` | sampling stride in pixels — **main perf lever** |
 | `uSpanJitter` | `spanJitter` | 0–1, irregularity of the block boundaries |
+| `uEdgeWobble` | `edgeWobble` | 0–1, bends the block seams into curves |
 | `uOrganicAmount` | `organicAmount` | master de-regulariser: per-line span, threshold and phase |
 | `uOrganicScale`, `uOrganicSpeed` | idem | width and drift of the per-line field |
 | `uAnimateThreshold`, `uThresholdAnimMode`, `uThresholdAnimAmount` | idem | global pulse: 0 sine, 1 noise, 2 FBM |

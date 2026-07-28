@@ -26,7 +26,14 @@ uniform vec2 uResolution;
 uniform float uTime; // continuous accumulated phase (see _phase in sketch-shaders.js)
 
 // —— Sort axis ——
-uniform float uAngle; // 0 = sort columns (vertical), PI/2 = rows
+// Any combination of the four can be on. With more than one, the image is split into
+// patches and each patch sorts along one of the enabled axes.
+uniform float uAxisVertical;
+uniform float uAxisHorizontal;
+uniform float uAxisDiagonal; // ↘
+uniform float uAxisAntiDiagonal; // ↗
+uniform float uAxisRegionScale; // patch size when several axes are on
+uniform float uAngle; // extra rotation applied on top of the chosen axis
 uniform vec2 uCenter; // pivot the axis turns around, normalised 0-1
 
 // —— Keys —— 0 luma, 1 hue, 2 saturation, 3 lightness, 4 R, 5 G, 6 B
@@ -43,6 +50,7 @@ uniform float uInvertOrder;
 uniform float uMaxSpan; // max span length in pixels
 uniform float uSpanStep; // sampling stride in pixels (main perf lever)
 uniform float uSpanJitter; // 0..1, breaks up the block grid seams
+uniform float uEdgeWobble; // 0..1, bends the block seams into curves
 
 // —— Animation: global pulsing threshold ——
 uniform float uAnimateThreshold;
@@ -71,6 +79,8 @@ uniform float uMix;
 
 #define NBINS 16.0
 #define TAU 6.28318530718
+#define HALF_PI 1.57079633
+#define QUARTER_PI 0.78539816
 
 // Block boundaries are pushed by up to ±BLOCK_JITTER of a block, so a jittered block can
 // reach (1 + 2*jitter) times its nominal length. The nominal length is capped by exactly
@@ -212,6 +222,50 @@ float thresholdWave(float time) {
 	return sin(time * TAU);
 }
 
+// How many axes are enabled.
+float axisCount() {
+	return step(0.5, uAxisVertical) + step(0.5, uAxisHorizontal) + step(0.5, uAxisDiagonal) + step(0.5, uAxisAntiDiagonal);
+}
+
+// Which sort axis rules at this position, before uAngle is added.
+//
+// With one axis enabled this is a constant and costs nothing. With several, the image is
+// diced into cells of a hashed grid and each cell draws one of the enabled axes. Spans
+// are cut wherever the axis changes, so a span never leaves its region and the whole
+// thing stays a bijection — neighbouring cells that happen to draw the same axis simply
+// merge, which is why the patches do not read as a grid.
+float axisAt(vec2 p, float n) {
+	if (n < 1.5) {
+		if (uAxisHorizontal > 0.5) return HALF_PI;
+		if (uAxisDiagonal > 0.5) return -QUARTER_PI;
+		if (uAxisAntiDiagonal > 0.5) return QUARTER_PI;
+		return 0.0; // vertical, and the fallback when nothing is checked
+	}
+
+	float k = min(floor(random(floor(p * uAxisRegionScale), 7.0) * n), n - 1.0);
+	float idx = 0.0;
+
+	if (uAxisVertical > 0.5) {
+		if (idx == k) return 0.0;
+		idx += 1.0;
+	}
+	if (uAxisHorizontal > 0.5) {
+		if (idx == k) return HALF_PI;
+		idx += 1.0;
+	}
+	if (uAxisDiagonal > 0.5) {
+		if (idx == k) return -QUARTER_PI;
+		idx += 1.0;
+	}
+	return QUARTER_PI;
+}
+
+// Diagonal axes only land back on whole pixels every sqrt(2) units, so their stride is
+// scaled to match — otherwise every tap falls between texels and the sort goes soft.
+float axisStrideScale(float axis) {
+	return (abs(abs(axis) - QUARTER_PI) < 0.01) ? 1.41421356 : 1.0;
+}
+
 // Position of block boundary n on this line, in step units.
 // Monotone in n as long as the jitter stays under half a block, which is what makes
 // "which block am I in" resolvable by testing a handful of candidates instead of
@@ -237,7 +291,12 @@ void main() {
 	vec2 uv = vTexCoord;
 	vec4 original = texture2D(uTexture, uv);
 
-	vec2 dir = vec2(sin(uAngle), cos(uAngle)); // uAngle = 0 → straight down the columns
+	float nAxes = axisCount();
+	bool multiAxis = nAxes > 1.5;
+	float axis = axisAt(uv, nAxes);
+
+	float ang = axis + uAngle; // axis 0 → straight down the columns
+	vec2 dir = vec2(sin(ang), cos(ang));
 	vec2 perpDir = vec2(dir.y, -dir.x);
 
 	// Everything downstream is measured from uCenter, so the block lattice and the
@@ -289,7 +348,7 @@ void main() {
 	gHigh = max(lo, hi);
 
 	// —— Span geometry ——
-	float stride = max(uSpanStep, 0.25);
+	float stride = max(uSpanStep, 0.25) * axisStrideScale(axis);
 	float span = uMaxSpan;
 	if (uAnimateSpan > 0.5) {
 		span *= 1.0 + sin(tLoc * uSpanAnimSpeed * TAU) * clamp(uSpanAnimAmount, 0.0, 0.95);
@@ -327,19 +386,29 @@ void main() {
 	// The jitter stays under half a block, so the boundary function is still monotone and
 	// my block is bracketed by candidates gi-1 … gi+2. Four evaluations, no search, and
 	// every pixel of a span resolves the same pair.
-	float gi = floor(t / maxK);
+	// The seam of a block is a straight line unless it is pushed by something that varies
+	// smoothly ACROSS the lines. `spanJitter` alone only moves whole lines in lockstep
+	// within a hash band, which is what makes the separations read as straight segments.
+	// This shifts the entire boundary set of a line by a continuous FBM of `perp`, so
+	// neighbouring lines cut at slightly different places and the seam becomes a curve.
+	// A uniform shift keeps the boundaries monotone and constant along the axis, so the
+	// permutation is untouched.
+	float wobble = (fbm(vec2(perp * oScale * 3.0, 61.0), oTime) * 1.06 - 0.5) * 2.0 * uEdgeWobble * maxK;
+	float tg = t - wobble;
+
+	float gi = floor(tg / maxK);
 
 	float blockStart = blockEdge(gi - 1.0, lineSeed, maxK, jit);
 	float blockEnd = blockEdge(gi + 2.0, lineSeed, maxK, jit);
 
 	for (int c = 0; c < 2; c++) {
 		float e = blockEdge(gi + float(c), lineSeed, maxK, jit);
-		if (e <= t) blockStart = max(blockStart, e);
+		if (e <= tg) blockStart = max(blockStart, e);
 		else blockEnd = min(blockEnd, e);
 	}
 
-	float backLimit = t - blockStart; // steps available before the block start
-	float fwdLimit = blockEnd - t; // steps available after me inside the block
+	float backLimit = tg - blockStart; // steps available before the block start
+	float fwdLimit = blockEnd - tg; // steps available after me inside the block
 
 	vec3 myColor = texture2D(uTexture, base).rgb;
 	if (!inBand(myColor)) {
@@ -361,6 +430,7 @@ void main() {
 
 		vec2 p = base - stepUV * fi;
 		if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) break;
+		if (multiAxis && abs(axisAt(p, nAxes) - axis) > 0.001) break;
 
 		vec3 c = texture2D(uTexture, p).rgb;
 		if (!inBand(c)) break;
@@ -376,6 +446,7 @@ void main() {
 
 		vec2 p = base + stepUV * fi;
 		if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) break;
+		if (multiAxis && abs(axisAt(p, nAxes) - axis) > 0.001) break;
 
 		vec3 c = texture2D(uTexture, p).rgb;
 		if (!inBand(c)) break;
