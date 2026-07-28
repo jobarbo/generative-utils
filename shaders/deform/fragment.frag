@@ -8,7 +8,8 @@ uniform float uSeed;
 uniform float uOctave;
 uniform float uAmount; // deformation scale
 uniform float uNoiseScale; // noise scale
-uniform bool uEmberMode;
+uniform float uEmberMode; // 0 = off, 1 = on (float like every other flag in the library —
+                          // p5 setUniform silently drops a number sent to a `bool` uniform)
 
 float random(vec2 st, float seed) {
 	return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -71,7 +72,7 @@ void main() {
 
 	vec4 texColor = texture2D(uTexture, deformedUV);
 
-	if (uEmberMode) {
+	if (uEmberMode > 0.5) {
 		// Calculate brightness based on movement magnitude (length of movement vector)
 		float movementMagnitude = length(movement);
 		// Apply smoothstep for steep contrast (adjust min/max to control range)

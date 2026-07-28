@@ -4,7 +4,6 @@ varying vec2 vTexCoord;
 
 uniform sampler2D uTexture;
 uniform float uTime;
-uniform vec2 uResolution;
 uniform float uSeed; // Random seed for noise variation
 uniform float uAmount; // Chromatic aberration intensity
 

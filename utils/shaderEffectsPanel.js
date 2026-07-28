@@ -613,6 +613,7 @@ class ShaderEffectsPanel {
 			k === "animatezoom" ||
 			k === "aspectcorrect" ||
 			k === "blurcrt" ||
+			k === "embermode" || // deform: GLSL `uniform bool`
 			k.includes("invert") ||
 			(k.includes("animate") && !k.includes("amount"))
 		);
@@ -659,7 +660,7 @@ class ShaderEffectsPanel {
 			blurdirection: {min: 0, max: Math.PI * 2, step: 0.01},
 
 			// —— Known units ——
-			lineDensity: {min: 1, max: 1000, step: 1, integer: true},
+			linedensity: {min: 1, max: 1000, step: 1, integer: true}, // keys are matched lowercased
 			dotradius: {min: 0, max: 1, step: 0.01},
 			gridsize: {min: 1, max: 1440, step: 1, integer: true},
 			sortamount: {min: 0, max: 18, step: 0.1},
