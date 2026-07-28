@@ -6,6 +6,7 @@ uniform sampler2D uTexture;
 uniform float uProgress; // Loading progress from 0.0 (0%) to 1.0 (100%)
 uniform float uSeed;
 uniform vec2 uResolution;
+uniform float uRenderDensity; // sizeScale = viewportScale × renderDensity — canvas+DPR scale for px constants
 
 // Random function
 float random(vec2 st, float seed) {
@@ -27,10 +28,12 @@ void main() {
 	
 	// Convert UV to pixel coordinates
 	vec2 pixelCoord = uv * uResolution;
+	float dens = max(uRenderDensity, 0.01);
 	
 	// Base grid size for block indexing (smaller than actual block sizes)
 	// This allows variable block sizes while maintaining a searchable grid
-	float baseGridSize = 24.0;
+	// Authored in px @ short-edge 1000; scaled by dens (sizeScale) so viewport + DPR stay consistent.
+	float baseGridSize = 24.0 * dens;
 	
 	// Calculate base block coordinates using grid
 	vec2 baseBlockCoord = floor(pixelCoord / baseGridSize);
@@ -61,7 +64,7 @@ void main() {
 	// Calculate initial displacement for this block (where it starts from)
 	// At 0% progress, blocks are displaced in all directions. At 100%, they're in correct position
 	// Ensure uniform distribution across all directions (left/right/up/down)
-	float maxDisplacement = 1.0; // Maximum pixel displacement
+	float maxDisplacement = 1.0 * dens; // Maximum displacement (px @ REF × sizeScale)
 	vec2 initialOffset = vec2(
 		(blockSeed1 - 0.5) * 2.0 * maxDisplacement, // -maxDisplacement to +maxDisplacement (left/right)
 		(blockSeed2 - 0.5) * 2.0 * maxDisplacement  // -maxDisplacement to +maxDisplacement (up/down)
@@ -107,8 +110,8 @@ void main() {
 			float testSeed4 = random(testCoord * 1.9 + vec2(uSeed * 1.7), uSeed + 444.444);
 			float testSeed5 = random(testCoord * 2.3 + vec2(uSeed * 1.3), uSeed + 555.555);
 			
-			// Get test block's size
-			float testSize = 24.0 + testSeed5 * 64.0;
+			// Get test block's size (px @ REF × sizeScale)
+			float testSize = (24.0 + testSeed5 * 64.0) * dens;
 			vec2 testBlockCenter = (testCoord + 0.5) * baseGridSize;
 			
 			float testSpeed = 0.4 + testSeed4 * 1.2;

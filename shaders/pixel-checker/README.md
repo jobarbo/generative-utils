@@ -21,8 +21,8 @@ A dual-mode shader that can create either:
   - 0.0 = no boost (recommended for subtle effect)
   - 0.05-0.15 = slight glow
   - Higher values = more vibrant subpixels
-- `uCellSize` (float) - Size of each CRT "pixel" (which contains 3 RGB subpixels)
-  - 3.0 = Very fine (each pixel = 3 screen pixels)
+- `uCellSize` (float) - Size of each CRT "pixel" in **px @ short-edge 1000** (which contains 3 RGB subpixels). JS scales by `sizeScale` (= viewport × DPR) so the look stays stable across canvas size and density.
+  - 3.0 = Very fine (each cell ≈ 3 px at REF)
   - 4.5 = Medium visibility
   - 6.0 = Large, clearly visible CRT pixels
 
@@ -51,7 +51,7 @@ shaderEffects.addEffect("pixelChecker", {
 		uCrtMode: "crtMode",
 		uDarkness: "darkness",
 		uBrightness: "brightness",
-		uCellSize: "cellSize",
+		uCellSize: "cellSize * sizeScale",
 	},
 });
 

@@ -780,8 +780,8 @@ class ShaderEffectsPanel {
 			levels: {min: 2, max: 256, step: 1, integer: true},
 			octave: {min: 1, max: 8, step: 1, integer: true},
 			blurquality: {min: 1, max: 128, step: 1, integer: true},
-			maxspan: {min: 1, max: 128, step: 1, integer: true}, // asdfSort span length in canvas px
-			spanstep: {min: 0.25, max: 4, step: 0.25}, // asdfSort sampling stride in canvas px
+			maxspan: {min: 1, max: 128, step: 1, integer: true}, // asdfSort — px @ short-edge 1000
+			spanstep: {min: 0.25, max: 4, step: 0.25}, // asdfSort stride @ REF 1000
 			spanjitter: {min: 0, max: 1, step: 0.01},
 			edgewobble: {min: 0, max: 1, step: 0.01},
 			axisregionscale: {min: 1, max: 32, step: 0.5},
@@ -795,6 +795,12 @@ class ShaderEffectsPanel {
 			linedensity: {min: 1, max: 1000, step: 1, integer: true}, // keys are matched lowercased
 			dotradius: {min: 0, max: 1, step: 0.01},
 			gridsize: {min: 1, max: 1440, step: 1, integer: true},
+			tilesize: {min: 1, max: 512, step: 1, integer: true}, // collage — px @ short-edge 1000
+			tilesize2: {min: 1, max: 512, step: 1, integer: true},
+			tilesize3: {min: 1, max: 512, step: 1, integer: true},
+			cellsize: {min: 1, max: 64, step: 0.1}, // crtDisplay — px @ short-edge 1000
+			scale: {min: 1, max: 64, step: 0.25}, // dither pattern cell — px @ short-edge 1000
+			bluramount: {min: 0, max: 128, step: 0.1}, // gaussian/directional @ REF 1000; radial is UV×0.01
 			sortamount: {min: 0, max: 18, step: 0.1},
 			translationspeedx: {min: 0, max: 5, step: 0.01},
 			translationspeedy: {min: 0, max: 5, step: 0.01},

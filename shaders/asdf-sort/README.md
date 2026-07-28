@@ -136,8 +136,8 @@ itself to crawl.
 | `uThresholdLow`, `uThresholdHigh` | `thresholdLow`, `thresholdHigh` | band; generalises Asendorf's black / brightness / white modes |
 | `uInvertGate` | `invertGate` | sort what falls *outside* the band |
 | `uInvertOrder` | `invertOrder` | descending |
-| `uMaxSpan` | `maxSpan` | nominal span length in **canvas pixels** (density-independent); JS multiplies by `renderDensity` before upload. Capped at 64 steps |
-| `uSpanStep` | `spanStep` | sampling stride in **canvas pixels** — same density scaling. **Main perf lever** |
+| `uMaxSpan` | `maxSpan` | nominal span length in **px @ short-edge 1000**; JS multiplies by `sizeScale` before upload. Capped at 64 steps |
+| `uSpanStep` | `spanStep` | sampling stride in **px @ REF 1000** — same `sizeScale`. **Main perf lever** |
 | `uSpanJitter` | `spanJitter` | 0–1, irregularity of the block boundaries |
 | `uEdgeWobble` | `edgeWobble` | 0–1, bends the block seams *and* the sweep front into curves |
 | `uOrganicAmount` | `organicAmount` | master de-regulariser: per-line span, threshold and phase |
@@ -151,16 +151,16 @@ itself to crawl.
 
 Cost is `2 × span length` fetches for gated pixels, 1 fetch otherwise. Two levers:
 
-- **`maxSpan`** — linear. 24 canvas px is a good default; 64 steps is the hard cap (`MAX_HALF`).
+- **`maxSpan`** — linear. 24 px @ REF 1000 is a good default; 64 steps is the hard cap (`MAX_HALF`).
 - **`spanStep`** — divides the cost by the stride for the same reach. Above `1.0` the
   sort becomes *blocky*: cells of `spanStep` pixels are snapped to a shared lattice and
   move together, which is a clean chunky look rather than noise. Use `spanStep 3` +
   `maxSpan 72` to get a 72 px reach for the price of a 24 px one.
 
-Both are authored in canvas pixels (density 1). `sketch-shaders.js` scales them by
-`renderDensity` (= sketch `pixelDensity` × panel density scale) so the visual size stays
-the same at any DPR; the shader still sees physical framebuffer pixels matching
-`uResolution`.
+Both are authored in pixels at short-edge 1000 (same REF as sketch `BASE_WIDTH` /
+`MULTIPLIER`). `sketch-shaders.js` scales them by `sizeScale` (= `viewportScale` ×
+`renderDensity`) so the visual size tracks canvas size and DPR; the shader still sees
+physical framebuffer pixels matching `uResolution`.
 
 Tightening the threshold band also cuts the cost directly, since out-of-band pixels exit
 after a single fetch.
