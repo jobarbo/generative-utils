@@ -27,8 +27,7 @@ uniform float uTime; // continuous accumulated phase (see _phase in sketch-shade
 
 // —— Sort axis ——
 uniform float uAngle; // 0 = sort columns (vertical), PI/2 = rows
-uniform float uAnimateAngle;
-uniform float uAngleSpeed;
+uniform vec2 uCenter; // pivot the axis turns around, normalised 0-1
 
 // —— Keys —— 0 luma, 1 hue, 2 saturation, 3 lightness, 4 R, 5 G, 6 B
 uniform float uSortKey;
@@ -238,14 +237,14 @@ void main() {
 	vec2 uv = vTexCoord;
 	vec4 original = texture2D(uTexture, uv);
 
-	float ang = uAngle;
-	if (uAnimateAngle > 0.5) ang += uTime * uAngleSpeed * TAU;
-
-	vec2 dir = vec2(sin(ang), cos(ang)); // ang = 0 → straight down the columns
+	vec2 dir = vec2(sin(uAngle), cos(uAngle)); // uAngle = 0 → straight down the columns
 	vec2 perpDir = vec2(dir.y, -dir.x);
 
+	// Everything downstream is measured from uCenter, so the block lattice and the
+	// per-line fields pivot around that point instead of around the texture origin.
 	vec2 px = uv * uResolution;
-	float perp = dot(px, perpDir) / max(uResolution.x, uResolution.y);
+	vec2 ctr = uCenter * uResolution;
+	float perp = (dot(px, perpDir) - dot(ctr, perpDir)) / max(uResolution.x, uResolution.y);
 
 	// —— Organic per-line fields ——
 	// Everything here is a function of `perp` and time only, so it is rigorously constant
@@ -312,8 +311,13 @@ void main() {
 	// Snapped to the step lattice so every fragment of a cell shares one sample chain —
 	// with stride > 1 that turns the sort into a clean blocky one (cells of `stride`
 	// pixels move together) instead of interleaved lattices fighting each other.
-	float t = floor(dot(px, dir) / stride) + 0.5;
-	vec2 base = uv + dir * (t - dot(px, dir) / stride) * stride / uResolution;
+	// The origin shift along the axis is snapped to a whole number of steps. A fractional
+	// shift would pull the sample lattice off the texel grid, every tap would land between
+	// two texels, and bilinear blending would quietly stop the result being a permutation.
+	float originT = floor(dot(ctr, dir) / stride) * stride;
+	float tRaw = (dot(px, dir) - originT) / stride;
+	float t = floor(tRaw) + 0.5;
+	vec2 base = uv + dir * (t - tRaw) * stride / uResolution;
 
 	// Block boundaries. A plain `floor(t / maxK) * maxK` grid puts a seam every maxK
 	// pixels on every line — a lattice you cannot unsee. Instead each boundary is pushed

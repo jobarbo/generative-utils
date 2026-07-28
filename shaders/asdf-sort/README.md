@@ -53,6 +53,13 @@ block, which keeps the boundary function monotone — so "which block am I in" i
 by testing four candidates rather than searching, and every pixel of a span agrees.
 `spanJitter` scales that irregularity (0 = regular grid).
 
+`center` is where that lattice is anchored: block boundaries and the per-line fields are
+measured from it, so changing `angle` pivots the whole structure around that point rather
+than around the texture corner. Its offset along the sort axis is snapped to a whole
+number of steps — a fractional shift would pull every sample off the texel grid and
+bilinear blending would quietly stop the result being a permutation. Note that a block
+boundary always falls on `center`, so a span never straddles it.
+
 For the same reason, **anything animating the threshold must be constant along the sort
 axis**. The global pulse depends on time only, and the sweep depends only on the
 coordinate *perpendicular* to the sort axis. A radial sweep would vary along a span and
@@ -82,7 +89,7 @@ line-to-line churn.
 | `uTexture`, `uResolution` | — | source + physical resolution |
 | `uTime` | `timeMultiplier` | fed by `_phase`, an accumulated clock — changing the speed does not jump |
 | `uAngle` | `angle` | `0` = sort columns, `PI/2` = sort rows |
-| `uAnimateAngle`, `uAngleSpeed` | `animateAngle`, `angleSpeed` | axis rotates over time |
+| `uCenter` | `center` | pivot the axis turns around, normalised 0–1 |
 | `uSortKey`, `uGateKey` | `sortKey`, `gateKey` | 0 luma, 1 hue, 2 saturation, 3 lightness, 4 R, 5 G, 6 B |
 | `uThresholdLow`, `uThresholdHigh` | `thresholdLow`, `thresholdHigh` | band; generalises Asendorf's black / brightness / white modes |
 | `uInvertGate` | `invertGate` | sort what falls *outside* the band |
