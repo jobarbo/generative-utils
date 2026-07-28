@@ -969,6 +969,37 @@ let p5PixelRatio = 1;
 let p5LogicalSize = null;
 let p5ScaleFactor = 1;
 
+// ---------------------------------------------------------------------------
+// Particle DPI compensation (reusable across projects)
+// ---------------------------------------------------------------------------
+
+/** Density the curve was measured against — do not change. */
+const PARTICLE_DPI_CALIBRATED_AT = 2;
+
+/** @private Default density PARTICLE_SIZE is expressed at. */
+const PARTICLE_DPI_REFERENCE_DEFAULT = 4;
+
+/** @private Default compensation strength (0 = off). */
+const PARTICLE_DPI_COMPENSATION_DEFAULT = 0.7;
+
+/**
+ * Multiplier to apply to a particle's canvas-unit size so visual weight stays
+ * constant across pixel densities.
+ *
+ * Reads optional sketch overrides `PARTICLE_DPI_REFERENCE` and
+ * `PARTICLE_DPI_COMPENSATION` when defined; otherwise uses utils defaults.
+ *
+ * @param {number} [density] - Pixel density (defaults to sketch `pixel_density`, else reference)
+ * @returns {number} Scale factor for PARTICLE_SIZE
+ */
+function particleDensityScale(density) {
+	const reference = typeof PARTICLE_DPI_REFERENCE !== "undefined" ? PARTICLE_DPI_REFERENCE : PARTICLE_DPI_REFERENCE_DEFAULT;
+	const compensation = typeof PARTICLE_DPI_COMPENSATION !== "undefined" ? PARTICLE_DPI_COMPENSATION : PARTICLE_DPI_COMPENSATION_DEFAULT;
+	const d = density !== undefined && density !== null ? density : typeof pixel_density !== "undefined" ? pixel_density : reference;
+	const curve = (x) => 1 + compensation * (1 / PARTICLE_DPI_CALIBRATED_AT - 1 / Math.max(x, 0.25));
+	return curve(d || reference) / curve(reference);
+}
+
 /**
  * Sets the pixel ratio for the p5.js canvas
  * @param {number} ratio - The pixel ratio to set
