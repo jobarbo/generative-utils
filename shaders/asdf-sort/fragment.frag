@@ -274,15 +274,20 @@ float blockEdge(float n, float lineSeed, float maxK, float jit) {
 	return (n + (random(vec2(n, lineSeed), 0.0) - 0.5) * 2.0 * jit) * maxK;
 }
 
-float sweepField(float perp, float time) {
+// `axial` is the block's position along the sort axis — constant inside a block, so the
+// field may use it as a second dimension without ever varying within a span.
+float sweepField(float perp, float axial, float time) {
 	int m = int(uSweepMode);
-	float p = perp * uSweepScale;
 	float t = time * uSweepSpeed;
+
+	// Bend the front. The wave modes are 1D by nature, so warp their coordinate by an FBM
+	// of `axial`; otherwise the front is a perfectly ruled line.
+	float p = perp * uSweepScale + (fbm(vec2(axial * uSweepScale * 1.5, 71.0), t) * 1.06 - 0.5) * uEdgeWobble * 2.0;
 
 	if (m == 1) return sin((p - t) * TAU) * 0.5;
 	if (m == 2) return fract(p - t) - 0.5; // hard scrolling front
-	if (m == 3) return noise(vec2(p * 4.0 + t, 11.0)) - 0.5;
-	if (m == 4) return fbm(vec2(p * 4.0, 11.0), t) - 0.5;
+	if (m == 3) return noise(vec2(p * 4.0 + t, axial * 4.0 + 11.0)) - 0.5;
+	if (m == 4) return fbm(vec2(p * 4.0, axial * 4.0 + 11.0), t) - 0.5;
 	return 0.0;
 }
 
@@ -306,46 +311,20 @@ void main() {
 	float perp = (dot(px, perpDir) - dot(ctr, perpDir)) / max(uResolution.x, uResolution.y);
 
 	// —— Organic per-line fields ——
-	// Everything here is a function of `perp` and time only, so it is rigorously constant
-	// ALONG the sort axis — which is the one thing the permutation cannot tolerate varying.
-	// That still leaves plenty of room: each line gets its own span length, its own
-	// threshold offset, its own block seams and its own animation phase, which is what
-	// stops the result reading as a grid.
+	// The span length has to be settled before the block grid can be laid out, so it can
+	// only depend on `perp` and time — rigorously constant ALONG the sort axis, which is
+	// the one thing the permutation cannot tolerate varying.
 	float org = clamp(uOrganicAmount, 0.0, 1.0);
 	float oScale = max(uOrganicScale, 0.01);
 	float oTime = uTime * uOrganicSpeed;
 
 	float lineSeed = floor(perp * oScale * 24.0); // discrete line groups, for hashes
 	float fSpan = fbm(vec2(perp * oScale, 5.0), oTime) * 1.06; // ≈[0,1]
-	float fThreshold = fbm(vec2(perp * oScale + 13.0, 91.0), oTime * 0.7) * 1.06;
 	float hLine = random(vec2(lineSeed, 17.0), 0.0);
 
 	// Per-line clock: without it every line pulses in lockstep, which is most of the
 	// "it breathes as one block" feeling.
 	float tLoc = uTime + hLine * 6.0 * org;
-
-	// —— Threshold band for this span ——
-	float lo = uThresholdLow;
-	float hi = uThresholdHigh;
-
-	if (uAnimateThreshold > 0.5) {
-		float w = thresholdWave(tLoc) * uThresholdAnimAmount;
-		lo += w;
-		hi += w;
-	}
-	if (uSweepMode >= 0.5) {
-		float s = sweepField(perp, tLoc) * uSweepAmount;
-		lo += s;
-		hi += s;
-	}
-
-	// Per-line band offset — breaks runs at a different luminance on every line
-	float thrOffset = (fThreshold - 0.5) * 0.6 * org;
-	lo += thrOffset;
-	hi += thrOffset;
-
-	gLow = min(lo, hi);
-	gHigh = max(lo, hi);
 
 	// —— Span geometry ——
 	float stride = max(uSpanStep, 0.25) * axisStrideScale(axis);
@@ -409,6 +388,38 @@ void main() {
 
 	float backLimit = tg - blockStart; // steps available before the block start
 	float fwdLimit = blockEnd - tg; // steps available after me inside the block
+
+	// —— Threshold band for this span ——
+	// Anything that shifts the band has to be identical for every pixel of a span. That
+	// does NOT mean it has to be constant along the whole axis — only within a block. So
+	// the band is allowed a second dimension, sampled at the block's midpoint: constant
+	// inside a block, free to change from one block to the next. Without it the band was
+	// a function of `perp` alone and its iso-lines were dead-straight lines running
+	// parallel to the sort axis — which is what made the sweep front look ruled.
+	float axial = (blockStart + blockEnd) * 0.5 * stride / max(uResolution.x, uResolution.y);
+
+	float lo = uThresholdLow;
+	float hi = uThresholdHigh;
+
+	if (uAnimateThreshold > 0.5) {
+		float w = thresholdWave(tLoc) * uThresholdAnimAmount;
+		lo += w;
+		hi += w;
+	}
+	if (uSweepMode >= 0.5) {
+		float s = sweepField(perp, axial, tLoc) * uSweepAmount;
+		lo += s;
+		hi += s;
+	}
+
+	// Per-block band offset — breaks runs at a different luminance all over the image
+	float fThreshold = fbm(vec2(perp * oScale + 13.0, axial * oScale + 91.0), oTime * 0.7) * 1.06;
+	float thrOffset = (fThreshold - 0.5) * 0.6 * org;
+	lo += thrOffset;
+	hi += thrOffset;
+
+	gLow = min(lo, hi);
+	gHigh = max(lo, hi);
 
 	vec3 myColor = texture2D(uTexture, base).rgb;
 	if (!inBand(myColor)) {

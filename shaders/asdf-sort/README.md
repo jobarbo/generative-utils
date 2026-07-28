@@ -66,10 +66,24 @@ number of steps — a fractional shift would pull every sample off the texel gri
 bilinear blending would quietly stop the result being a permutation. Note that a block
 boundary always falls on `center`, so a span never straddles it.
 
-For the same reason, **anything animating the threshold must be constant along the sort
-axis**. The global pulse depends on time only, and the sweep depends only on the
-coordinate *perpendicular* to the sort axis. A radial sweep would vary along a span and
-shred the permutation — hence the perpendicular-only sweep modes.
+### Why the threshold gets a second dimension
+
+Anything that shifts the threshold band must be identical for every pixel of a span. The
+obvious reading of that is "constant along the whole sort axis", which is what the sweep
+originally was — a function of the perpendicular coordinate alone. The consequence is that
+its iso-lines are dead-straight lines running parallel to the sort axis, so the sweep front
+arrives as a ruled edge.
+
+But the requirement is only "constant *within a block*", and blocks are already bounded.
+So the band is sampled at `axial` — the block's midpoint along the axis — which is constant
+inside a block and free to change from one block to the next. That buys back a second
+dimension: `sweepMode` 3 and 4 are genuinely 2D fields, and the two wave modes get their
+coordinate warped by an FBM of `axial` scaled by `edgeWobble`. The front becomes a ragged
+staircase at block granularity instead of a straight line. The same treatment is applied to
+the per-block threshold offset from `organicAmount`.
+
+A radial sweep would still be impossible: it varies *continuously* along the span rather
+than per block, and would shred the permutation.
 
 ### Mixing axes
 
@@ -125,11 +139,11 @@ itself to crawl.
 | `uMaxSpan` | `maxSpan` | nominal span length in pixels, capped at 64 steps |
 | `uSpanStep` | `spanStep` | sampling stride in pixels — **main perf lever** |
 | `uSpanJitter` | `spanJitter` | 0–1, irregularity of the block boundaries |
-| `uEdgeWobble` | `edgeWobble` | 0–1, bends the block seams into curves |
+| `uEdgeWobble` | `edgeWobble` | 0–1, bends the block seams *and* the sweep front into curves |
 | `uOrganicAmount` | `organicAmount` | master de-regulariser: per-line span, threshold and phase |
 | `uOrganicScale`, `uOrganicSpeed` | idem | width and drift of the per-line field |
 | `uAnimateThreshold`, `uThresholdAnimMode`, `uThresholdAnimAmount` | idem | global pulse: 0 sine, 1 noise, 2 FBM |
-| `uSweepMode`, `uSweepAmount`, `uSweepScale`, `uSweepSpeed` | idem | sweep: 0 off, 1 sine, 2 scrolling ramp, 3 noise, 4 FBM |
+| `uSweepMode`, `uSweepAmount`, `uSweepScale`, `uSweepSpeed` | idem | sweep: 0 off, 1 sine, 2 scrolling ramp, 3 noise 2D, 4 FBM 2D. Front shape is bent by `edgeWobble` |
 | `uAnimateSpan`, `uSpanAnimAmount`, `uSpanAnimSpeed` | idem | span length breathes |
 | `uMix` | `mix` | blend original ↔ sorted |
 
