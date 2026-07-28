@@ -639,12 +639,19 @@ class ShaderEffectsPanel {
 			outofboundsmode: {min: 0, max: 3, step: 1, integer: true}, // black clamp mirror alpha
 			blurmode: {min: 0, max: 2, step: 1, integer: true}, // gaussian radial directional
 			filtermode: {min: 0, max: 1, step: 1, integer: true}, // true pixel / filter overlay
+			sortkey: {min: 0, max: 6, step: 1, integer: true}, // luma hue sat light R G B
+			gatekey: {min: 0, max: 6, step: 1, integer: true},
+			sweepmode: {min: 0, max: 4, step: 1, integer: true}, // off sine ramp noise FBM
+			thresholdanimmode: {min: 0, max: 2, step: 1, integer: true}, // sine noise FBM
 
 			// —— Discrete counts ——
 			samplecount: {min: 1, max: 64, step: 1, integer: true},
 			levels: {min: 2, max: 256, step: 1, integer: true},
 			octave: {min: 1, max: 8, step: 1, integer: true},
 			blurquality: {min: 1, max: 128, step: 1, integer: true},
+			maxspan: {min: 1, max: 128, step: 1, integer: true}, // asdfSort span length in px
+			spanstep: {min: 0.25, max: 4, step: 0.25}, // asdfSort sampling stride in px
+			spanjitter: {min: 0, max: 1, step: 0.01},
 
 			// —— Degrees / angles ——
 			rotationstartingangle: {min: 0, max: 360, step: 0.1},
