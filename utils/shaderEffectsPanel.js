@@ -780,8 +780,8 @@ class ShaderEffectsPanel {
 			levels: {min: 2, max: 256, step: 1, integer: true},
 			octave: {min: 1, max: 8, step: 1, integer: true},
 			blurquality: {min: 1, max: 128, step: 1, integer: true},
-			maxspan: {min: 1, max: 128, step: 1, integer: true}, // asdfSort span length in px
-			spanstep: {min: 0.25, max: 4, step: 0.25}, // asdfSort sampling stride in px
+			maxspan: {min: 1, max: 128, step: 1, integer: true}, // asdfSort span length in canvas px
+			spanstep: {min: 0.25, max: 4, step: 0.25}, // asdfSort sampling stride in canvas px
 			spanjitter: {min: 0, max: 1, step: 0.01},
 			edgewobble: {min: 0, max: 1, step: 0.01},
 			axisregionscale: {min: 1, max: 32, step: 0.5},
