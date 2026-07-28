@@ -15,7 +15,7 @@ class ShaderManager {
 			width: 1,
 			height: 1,
 		};
-		this.crispPixels = false; // NEAREST sampling in shader passes
+		this.crispPixels = true; // NEAREST sampling in shader passes
 	}
 
 	/**
