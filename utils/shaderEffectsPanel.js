@@ -107,6 +107,16 @@ class ShaderEffectsPanel {
 					</select>
 				</div>
 				<div class="shader-effects-panel__output-row">
+					<span class="shader-effects-panel__output-label">density</span>
+					<select class="shader-effects-panel__preset" data-ref="density" style="max-width: none; flex: 1" title="Pixel density the shader stage renders at. Lower is cheaper and coarser, higher supersamples.">
+						<option value="0.25">¼</option>
+						<option value="0.5">½</option>
+						<option value="1">match sketch</option>
+						<option value="2">×2</option>
+						<option value="4">×4</option>
+					</select>
+				</div>
+				<div class="shader-effects-panel__output-row">
 					<span class="shader-effects-panel__output-label">size</span>
 					<input type="number" class="shader-effects-panel__number" data-ref="size-w" min="16" step="1" title="Canvas width" />
 					<span class="shader-effects-panel__output-sep">×</span>
@@ -140,6 +150,7 @@ class ShaderEffectsPanel {
 			sizeW: panel.querySelector("[data-ref='size-w']"),
 			sizeH: panel.querySelector("[data-ref='size-h']"),
 			apply: panel.querySelector("[data-ref='size-apply']"),
+			density: panel.querySelector("[data-ref='density']"),
 		};
 
 		panel.addEventListener("keydown", (e) => e.stopPropagation());
@@ -165,7 +176,16 @@ class ShaderEffectsPanel {
 			r.sizeW.addEventListener(ev, stop);
 			r.sizeH.addEventListener(ev, stop);
 			r.apply.addEventListener(ev, stop);
+			if (r.density) r.density.addEventListener(ev, stop);
 		});
+
+		if (r.density) {
+			// No re-sync here: the select still holds focus, so _syncDensityControl() would
+			// bail out anyway. The next frame after blur snaps it to the applied value.
+			r.density.addEventListener("change", () => {
+				this._applyOutputDensity(parseFloat(r.density.value));
+			});
+		}
 
 		const commitRatio = () => {
 			if (!this.shaderEffects?.setRenderRatio) return;
@@ -266,6 +286,114 @@ class ShaderEffectsPanel {
 		});
 	}
 
+	/**
+	 * localStorage key for the output density.
+	 *
+	 * Kept separate from the host's panel snapshot on purpose: the snapshot format is
+	 * owned by each project's ShaderEffects, so persisting here keeps this control
+	 * working in any project that loads the panel, with no host changes.
+	 */
+	static get DENSITY_STORAGE_KEY() {
+		return "shaderEffectsPanel.outputDensityScale";
+	}
+
+	/** Pixel density the sketch draws its artwork at. */
+	_sourceDensity() {
+		const se = this.shaderEffects;
+		const fromMain = se?.mainCanvas?.pixelDensity?.();
+		if (Number.isFinite(fromMain) && fromMain > 0) return fromMain;
+		const fromPipeline = se?.shaderPipeline?.sourceDensity;
+		if (Number.isFinite(fromPipeline) && fromPipeline > 0) return fromPipeline;
+		return Number.isFinite(se?.pixelDensity) && se.pixelDensity > 0 ? se.pixelDensity : 1;
+	}
+
+	_formatDensity(value) {
+		return String(Math.round(value * 100) / 100);
+	}
+
+	/**
+	 * Render the shader stage at `scale` × the sketch density.
+	 *
+	 * The pipeline owns the whole mechanism: it allocates its buffers at the scaled density
+	 * and blits the result to the canvas. Nothing here touches p5's own pixel density —
+	 * that is global state the sketch owns, and any p5.Graphics created after a change
+	 * inherits it, which rescales the artwork buffer and compounds across reloads.
+	 *
+	 * @param {number} scale
+	 * @param {boolean} [persist=true]
+	 */
+	_applyOutputDensity(scale, persist = true) {
+		const se = this.shaderEffects;
+		const pipeline = se?.shaderPipeline;
+		if (typeof pipeline?.setDensityScale !== "function") return;
+
+		pipeline.setDensityScale(scale);
+		const applied = pipeline.getDensityScale();
+		se.reinitializePipeline?.();
+
+		if (persist) {
+			try {
+				localStorage.setItem(ShaderEffectsPanel.DENSITY_STORAGE_KEY, String(applied));
+			} catch {
+				/* private mode — the control still works, it just will not survive a reload */
+			}
+		}
+	}
+
+	_readPersistedDensity() {
+		try {
+			const raw = localStorage.getItem(ShaderEffectsPanel.DENSITY_STORAGE_KEY);
+			if (raw == null) return null;
+			const v = parseFloat(raw);
+			return Number.isFinite(v) && v > 0 ? v : null;
+		} catch {
+			return null;
+		}
+	}
+
+	_syncDensityControl() {
+		const r = this.outputRefs;
+		const pipeline = this.shaderEffects?.shaderPipeline;
+		if (!r?.density) return;
+
+		// Older library builds have no density scaling — show the control as unavailable
+		// rather than silently doing nothing.
+		const available = typeof pipeline?.setDensityScale === "function";
+		if (r.density.disabled === available) r.density.disabled = !available;
+		if (!available) return;
+
+		// Restore once, as soon as the pipeline exists
+		if (!this._densityRestored) {
+			this._densityRestored = true;
+			const saved = this._readPersistedDensity();
+			if (saved != null && saved !== pipeline.getDensityScale()) {
+				this._applyOutputDensity(saved, false);
+			}
+		}
+
+		// This runs on every animation frame. Rewriting an <option> rebuilds the native
+		// popup, so while the select is focused — which is exactly when the popup is open —
+		// Chrome tears it down 60 times a second: it flickers and swallows every click.
+		// Leave the DOM alone while it has focus, and never write a value that is already
+		// there.
+		if (document.activeElement === r.density) return;
+
+		const source = this._sourceDensity();
+		for (const opt of r.density.options) {
+			if (!opt.dataset.baseLabel) opt.dataset.baseLabel = opt.textContent;
+			const label = `${opt.dataset.baseLabel} (${this._formatDensity(source * parseFloat(opt.value))})`;
+			if (opt.textContent !== label) opt.textContent = label;
+		}
+
+		// Snap to the closest listed option so an out-of-list value never blanks the select
+		const scale = pipeline.getDensityScale();
+		let best = r.density.options[0];
+		for (const opt of r.density.options) {
+			if (Math.abs(parseFloat(opt.value) - scale) < Math.abs(parseFloat(best.value) - scale)) best = opt;
+		}
+		if (r.density.value !== best.value) r.density.value = best.value;
+	}
+
 	_setRatioFieldsEnabled(enabled) {
 		const r = this.outputRefs;
 		if (!r) return;
@@ -305,6 +433,7 @@ class ShaderEffectsPanel {
 		if (document.activeElement !== r.ratioH) r.ratioH.value = String(ratio.height ?? 1);
 		this._setRatioFieldsEnabled(!ratio.fitCanvas);
 		this._updateRatioPresetMatch();
+		this._syncDensityControl();
 
 		// Don't clobber in-progress size edits (otherwise Apply reads reset values)
 		if (this._sizeDirty) return;
@@ -1036,6 +1165,12 @@ class ShaderEffectsPanel {
 		if (typeof this.shaderEffects.resetToDefaultPanelConfig === "function") {
 			this.shaderEffects.resetToDefaultPanelConfig();
 		}
+		try {
+			localStorage.removeItem(ShaderEffectsPanel.DENSITY_STORAGE_KEY);
+		} catch {
+			/* ignore */
+		}
+		this._applyOutputDensity(1, false);
 		this._rebuildDrawers();
 		this._syncOutputControls();
 		console.log("[shaderEffectsPanel] cleared saved shaders and restored defaults");
