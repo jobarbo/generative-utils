@@ -88,11 +88,12 @@ than per block, and would shred the permutation.
 ### Mixing axes
 
 The four axis checkboxes combine freely. With exactly one ticked the axis is a constant
-and the region lookup is skipped entirely. With several, the image is diced into cells of
-a hashed grid (`axisRegionScale`) and each cell draws one of the enabled axes. Spans are
+and the region lookup is skipped entirely. With several, the image is split into organic
+Voronoi patches (`axisRegionScale` sets feature density) — a lightly domain-warped Worley
+field, not a rectangular grid — and each patch draws one of the enabled axes. Spans are
 cut wherever the axis changes, so a span never leaves its region and the whole thing stays
 a bijection — and neighbouring cells that happen to draw the same axis simply merge, which
-is why the patches do not read as a grid.
+is why the patches do not read as a lattice.
 
 `angle` is now an extra rotation applied on top of whichever axis a region picked, so it
 tilts the entire arrangement without breaking the combination.
@@ -129,7 +130,7 @@ itself to crawl.
 | `uTexture`, `uResolution` | — | source + physical resolution |
 | `uTime` | `timeMultiplier` | fed by `_phase`, an accumulated clock — changing the speed does not jump |
 | `uAxisVertical` … `uAxisAntiDiagonal` | `axisVertical`, `axisHorizontal`, `axisDiagonal`, `axisAntiDiagonal` | checkboxes, any combination |
-| `uAxisRegionScale` | `axisRegionScale` | patch size when several axes are on |
+| `uAxisRegionScale` | `axisRegionScale` | Voronoi feature density when several axes are on |
 | `uAngle` | `angle` | extra rotation applied on top of the chosen axis |
 | `uCenter` | `center` | pivot the axis turns around, normalised 0–1 |
 | `uSortKey`, `uGateKey` | `sortKey`, `gateKey` | 0 luma, 1 hue, 2 saturation, 3 lightness, 4 R, 5 G, 6 B |

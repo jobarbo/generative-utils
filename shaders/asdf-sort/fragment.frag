@@ -227,13 +227,43 @@ float axisCount() {
 	return step(0.5, uAxisVertical) + step(0.5, uAxisHorizontal) + step(0.5, uAxisDiagonal) + step(0.5, uAxisAntiDiagonal);
 }
 
+// Organic multi-axis patch id — Worley (Voronoi) cell of a lightly domain-warped UV.
+// Replaces floor(p * scale) squares with irregular polygonal regions while keeping
+// axisRegionScale as the density knob (feature points per unit UV).
+// Single-octave warp (not FBM): this runs in the span walk, so cost matters.
+vec2 axisRegionId(vec2 p) {
+	float scale = max(uAxisRegionScale, 0.5);
+	vec2 warped = p + (vec2(
+		noise(p * scale * 0.7 + vec2(19.0, 7.0)),
+		noise(p * scale * 0.7 + vec2(41.0, 23.0))
+	) - 0.5) * (0.28 / scale);
+
+	vec2 scaled = warped * scale;
+	vec2 base = floor(scaled);
+	float best = 1e9;
+	vec2 id = base;
+
+	for (int j = -1; j <= 1; j++) {
+		for (int i = -1; i <= 1; i++) {
+			vec2 cell = base + vec2(float(i), float(j));
+			vec2 feature = cell + vec2(random(cell, 1.3), random(cell, 2.7));
+			float d = distance(scaled, feature);
+			if (d < best) {
+				best = d;
+				id = cell;
+			}
+		}
+	}
+	return id;
+}
+
 // Which sort axis rules at this position, before uAngle is added.
 //
 // With one axis enabled this is a constant and costs nothing. With several, the image is
-// diced into cells of a hashed grid and each cell draws one of the enabled axes. Spans
+// split into organic Voronoi patches and each patch draws one of the enabled axes. Spans
 // are cut wherever the axis changes, so a span never leaves its region and the whole
 // thing stays a bijection — neighbouring cells that happen to draw the same axis simply
-// merge, which is why the patches do not read as a grid.
+// merge, which is why the patches do not read as a lattice.
 float axisAt(vec2 p, float n) {
 	if (n < 1.5) {
 		if (uAxisHorizontal > 0.5) return HALF_PI;
@@ -242,7 +272,7 @@ float axisAt(vec2 p, float n) {
 		return 0.0; // vertical, and the fallback when nothing is checked
 	}
 
-	float k = min(floor(random(floor(p * uAxisRegionScale), 7.0) * n), n - 1.0);
+	float k = min(floor(random(axisRegionId(p), 7.0) * n), n - 1.0);
 	float idx = 0.0;
 
 	if (uAxisVertical > 0.5) {
