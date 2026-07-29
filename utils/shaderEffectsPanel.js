@@ -128,6 +128,9 @@ class ShaderEffectsPanel {
 			<div class="shader-effects-panel__footer" data-ref="footer">
 				<select class="shader-effects-panel__template" data-ref="template" title="Effect type"></select>
 				<button type="button" class="shader-effects-panel__add" data-ref="add" title="Add effect">+</button>
+				<button type="button" class="shader-effects-panel__io" data-ref="export" title="Export settings as JSON">↓ json</button>
+				<button type="button" class="shader-effects-panel__io" data-ref="import" title="Import settings from JSON">↑ json</button>
+				<input type="file" accept="application/json,.json" data-ref="import-file" hidden />
 				<label class="shader-effects-panel__clear" title="Clear saved shader settings from localStorage and restore defaults">
 					<input type="checkbox" data-ref="clear-storage" />
 					<span>Clear saved</span>
@@ -140,6 +143,9 @@ class ShaderEffectsPanel {
 		this.listEl = panel.querySelector("[data-ref='list']");
 		this.templateSelect = panel.querySelector("[data-ref='template']");
 		this.addBtn = panel.querySelector("[data-ref='add']");
+		this.exportBtn = panel.querySelector("[data-ref='export']");
+		this.importBtn = panel.querySelector("[data-ref='import']");
+		this.importFileInput = panel.querySelector("[data-ref='import-file']");
 		this.clearStorageCheckbox = panel.querySelector("[data-ref='clear-storage']");
 		this.outputRefs = {
 			fit: panel.querySelector("[data-ref='fit-canvas']"),
@@ -156,6 +162,7 @@ class ShaderEffectsPanel {
 		panel.addEventListener("keydown", (e) => e.stopPropagation());
 		this._bindListDnD();
 		this._bindAddFooter();
+		this._bindImportExport();
 		this._bindClearStorageCheckbox();
 		this._bindOutputControls();
 		this._syncOutputControls();
@@ -451,6 +458,101 @@ class ShaderEffectsPanel {
 			const type = this.templateSelect?.value;
 			if (type) this._createEffect(type);
 		});
+	}
+
+	_bindImportExport() {
+		if (!this.exportBtn || this.exportBtn.dataset.bound) return;
+		this.exportBtn.dataset.bound = "1";
+
+		this.exportBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			this._exportSettingsFile();
+		});
+
+		this.importBtn?.addEventListener("click", (e) => {
+			e.preventDefault();
+			this.importFileInput?.click();
+		});
+
+		this.importFileInput?.addEventListener("change", () => {
+			const file = this.importFileInput.files?.[0];
+			if (this.importFileInput) this.importFileInput.value = "";
+			if (file) this._importSettingsFile(file);
+		});
+	}
+
+	_exportTimestamp() {
+		const d = new Date();
+		const pad = (n) => String(n).padStart(2, "0");
+		return (
+			`${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` +
+			`-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+		);
+	}
+
+	_exportSettingsFile() {
+		if (!this.shaderEffects?.exportPanelConfig) {
+			console.warn("[shaderEffectsPanel] exportPanelConfig unavailable");
+			return;
+		}
+
+		const snapshot = this.shaderEffects.exportPanelConfig();
+		const density = this.shaderEffects.shaderPipeline?.getDensityScale?.();
+		if (Number.isFinite(density) && density > 0) {
+			snapshot.outputDensityScale = density;
+		}
+
+		const blob = new Blob([JSON.stringify(snapshot, null, 2)], {type: "application/json"});
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `shader-panel-${this._exportTimestamp()}.json`;
+		a.click();
+		URL.revokeObjectURL(url);
+		console.log("[shaderEffectsPanel] exported settings", a.download);
+	}
+
+	_importSettingsFile(file) {
+		if (!this.shaderEffects?.importPanelConfig) {
+			console.warn("[shaderEffectsPanel] importPanelConfig unavailable");
+			return;
+		}
+
+		const reader = new FileReader();
+		reader.onload = () => {
+			let data;
+			try {
+				data = JSON.parse(String(reader.result || ""));
+			} catch (error) {
+				console.warn("[shaderEffectsPanel] import failed — invalid JSON:", error);
+				return;
+			}
+
+			if (!data || data.version !== 1 || !data.effects || typeof data.effects !== "object") {
+				console.warn("[shaderEffectsPanel] import failed — expected version 1 snapshot with effects");
+				return;
+			}
+
+			const ok = this.shaderEffects.importPanelConfig(data);
+			if (!ok) {
+				console.warn("[shaderEffectsPanel] import failed — nothing applied");
+				return;
+			}
+
+			const density = data.outputDensityScale;
+			if (Number.isFinite(density) && density > 0) {
+				this._applyOutputDensity(density);
+			}
+
+			this._rebuildDrawers();
+			this._syncOutputControls();
+			this._scheduleSave();
+			console.log("[shaderEffectsPanel] imported settings from", file.name);
+		};
+		reader.onerror = () => {
+			console.warn("[shaderEffectsPanel] import failed — could not read file");
+		};
+		reader.readAsText(file);
 	}
 
 	_fillTemplateSelect() {
