@@ -24,6 +24,7 @@ varying vec2 vTexCoord;
 uniform sampler2D uTexture;
 uniform vec2 uResolution;
 uniform float uTime; // continuous accumulated phase (see _phase in sketch-shaders.js)
+uniform float uSeed; // fxhash / sketch seed — drives generative Voronoi patches
 
 // —— Sort axis ——
 // Any combination of the four can be on. With more than one, the image is split into
@@ -231,11 +232,14 @@ float axisCount() {
 // Replaces floor(p * scale) squares with irregular polygonal regions while keeping
 // axisRegionScale as the density knob (feature points per unit UV).
 // Single-octave warp (not FBM): this runs in the span walk, so cost matters.
+// Feature points and warp are seeded by uSeed so each mint / regeneration gets a
+// different patch layout (deterministic for a given hash).
 vec2 axisRegionId(vec2 p) {
 	float scale = max(uAxisRegionScale, 0.5);
+	vec2 seedOff = vec2(uSeed * 0.137, uSeed * 0.271);
 	vec2 warped = p + (vec2(
-		noise(p * scale * 0.7 + vec2(19.0, 7.0)),
-		noise(p * scale * 0.7 + vec2(41.0, 23.0))
+		noise(p * scale * 0.7 + vec2(19.0, 7.0) + seedOff),
+		noise(p * scale * 0.7 + vec2(41.0, 23.0) + seedOff)
 	) - 0.5) * (0.28 / scale);
 
 	vec2 scaled = warped * scale;
@@ -246,7 +250,7 @@ vec2 axisRegionId(vec2 p) {
 	for (int j = -1; j <= 1; j++) {
 		for (int i = -1; i <= 1; i++) {
 			vec2 cell = base + vec2(float(i), float(j));
-			vec2 feature = cell + vec2(random(cell, 1.3), random(cell, 2.7));
+			vec2 feature = cell + vec2(random(cell, 1.3 + uSeed), random(cell, 2.7 + uSeed));
 			float d = distance(scaled, feature);
 			if (d < best) {
 				best = d;
@@ -272,7 +276,7 @@ float axisAt(vec2 p, float n) {
 		return 0.0; // vertical, and the fallback when nothing is checked
 	}
 
-	float k = min(floor(random(axisRegionId(p), 7.0) * n), n - 1.0);
+	float k = min(floor(random(axisRegionId(p), 7.0 + uSeed) * n), n - 1.0);
 	float idx = 0.0;
 
 	if (uAxisVertical > 0.5) {

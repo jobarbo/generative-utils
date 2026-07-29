@@ -90,7 +90,8 @@ than per block, and would shred the permutation.
 The four axis checkboxes combine freely. With exactly one ticked the axis is a constant
 and the region lookup is skipped entirely. With several, the image is split into organic
 Voronoi patches (`axisRegionScale` sets feature density) — a lightly domain-warped Worley
-field, not a rectangular grid — and each patch draws one of the enabled axes. Spans are
+field seeded by `uSeed` / `shaderSeed` so each mint gets a different layout, not a
+rectangular grid — and each patch draws one of the enabled axes. Spans are
 cut wherever the axis changes, so a span never leaves its region and the whole thing stays
 a bijection — and neighbouring cells that happen to draw the same axis simply merge, which
 is why the patches do not read as a lattice.
@@ -129,6 +130,7 @@ itself to crawl.
 |---|---|---|
 | `uTexture`, `uResolution` | — | source + physical resolution |
 | `uTime` | `timeMultiplier` | fed by `_phase`, an accumulated clock — changing the speed does not jump |
+| `uSeed` | — | `shaderSeed` — generative Voronoi / axis layout per mint |
 | `uAxisVertical` … `uAxisAntiDiagonal` | `axisVertical`, `axisHorizontal`, `axisDiagonal`, `axisAntiDiagonal` | checkboxes, any combination |
 | `uAxisRegionScale` | `axisRegionScale` | Voronoi feature density when several axes are on |
 | `uAngle` | `angle` | extra rotation applied on top of the chosen axis |
