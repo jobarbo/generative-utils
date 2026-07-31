@@ -18,9 +18,12 @@ uniform float uPulseSpeed; // pulse rate (legacy ≈ 1.7)
 uniform float uWaveAmount; // cartesian ripple amplitude (legacy ≈ 0.00001 — nearly off)
 uniform float uWaveFrequency; // cartesian ripple frequency (legacy ≈ 1.0)
 
-// Mirror-wrap UVs so displacement outside [0,1] reflects content instead of edge smear / flat color
+// Mirror-wrap UVs so displacement outside [0,1] reflects content instead of edge smear.
+// Must be identity on [0,1] — the old `1 - abs(fract(u)*2 - 1)` folded every unit
+// interval at 0.5 and looked like a symmetry pass even with zero offset.
 vec2 mirrorRepeat(vec2 u) {
-	return 1.0 - abs(fract(u) * 2.0 - 1.0);
+	vec2 m = mod(mod(u, 2.0) + 2.0, 2.0); // [0, 2), safe for negative u
+	return mix(m, 2.0 - m, step(1.0, m));
 }
 
 void main() {
