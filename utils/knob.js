@@ -91,7 +91,8 @@ if (navigator.requestMIDIAccess) {
 
 			if (currentPage === 0) {
 				if (controller === 32) {
-					const angle = map(value, 0, 127, 0, PI * 1, true);
+					// rotationStartingAngle is degrees [0..360] (converted to rad in the shader uniform)
+					const angle = map(value, 0, 127, 0, 360, true);
 					if (knobSmoothing[32]) {
 						knobSmoothing[32].target = angle;
 					}
