@@ -67,6 +67,68 @@ class ShaderEffectsPanel {
 		this.el.setAttribute("aria-hidden", this.visible ? "false" : "true");
 	}
 
+	/**
+	 * Capture the accumulated artwork before a host resize clears its backing store.
+	 * Keeping this in the shared panel makes size changes safe without requiring every
+	 * project's ShaderEffects.resize() implementation to duplicate the same workaround.
+	 */
+	_captureArtworkBeforeResize() {
+		const graphics = this.shaderEffects?.mainCanvas;
+		const source = graphics?.canvas || graphics?.elt;
+		const context = graphics?.drawingContext;
+		if (!source || typeof document === "undefined") return null;
+
+		try {
+			const canvas = document.createElement("canvas");
+			canvas.width = source.width;
+			canvas.height = source.height;
+			const snapshotContext = canvas.getContext("2d");
+			if (!snapshotContext) return null;
+			snapshotContext.drawImage(source, 0, 0);
+
+			return {
+				canvas,
+				transform: context?.getTransform?.() || null,
+				imageSmoothingEnabled: context?.imageSmoothingEnabled,
+				globalCompositeOperation: context?.globalCompositeOperation,
+			};
+		} catch (error) {
+			console.warn("[shaderEffectsPanel] could not preserve artwork during resize:", error);
+			return null;
+		}
+	}
+
+	_restoreArtworkAfterResize(snapshot) {
+		if (!snapshot) return;
+
+		const graphics = this.shaderEffects?.mainCanvas;
+		const target = graphics?.canvas || graphics?.elt;
+		const context = graphics?.drawingContext;
+		// The accumulated p5 sketches used with this panel render into a 2D Graphics
+		// buffer. Leave other renderer types untouched instead of risking their state.
+		if (!target || !context || typeof context.drawImage !== "function") return;
+
+		try {
+			context.save();
+			context.setTransform(1, 0, 0, 1, 0, 0);
+			context.globalCompositeOperation = "copy";
+			context.drawImage(snapshot.canvas, 0, 0, snapshot.canvas.width, snapshot.canvas.height, 0, 0, target.width, target.height);
+			context.restore();
+
+			if (snapshot.transform && typeof context.setTransform === "function") {
+				context.setTransform(snapshot.transform);
+			}
+			if (typeof snapshot.imageSmoothingEnabled === "boolean") {
+				context.imageSmoothingEnabled = snapshot.imageSmoothingEnabled;
+			}
+			if (snapshot.globalCompositeOperation) {
+				context.globalCompositeOperation = snapshot.globalCompositeOperation;
+			}
+		} catch (error) {
+			console.warn("[shaderEffectsPanel] could not restore artwork after resize:", error);
+		}
+	}
+
 	_ensureDom() {
 		if (this.el) return;
 
@@ -256,7 +318,11 @@ class ShaderEffectsPanel {
 			this._editing = true;
 			this._sizeDirty = false;
 			try {
+				const artworkSnapshot = this._captureArtworkBeforeResize();
 				this.shaderEffects.resize(w, h);
+				this._restoreArtworkAfterResize(artworkSnapshot);
+				// Completed sketches may no longer have an animation frame scheduled.
+				this.shaderEffects.apply?.();
 				const size = this.shaderEffects.getCanvasSize?.() || {width: w, height: h};
 				r.sizeW.value = String(Math.round(size.width || w));
 				r.sizeH.value = String(Math.round(size.height || h));
