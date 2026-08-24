@@ -703,7 +703,7 @@ function showSaveNotification(message, type = "info", duration = 3500) {
 		warning: "rgba(153, 94, 14, 0.96)",
 		error: "rgba(158, 43, 43, 0.96)",
 	};
-	const icons = { info: "…", success: "✓", warning: "!", error: "×" };
+	const icons = {info: "…", success: "✓", warning: "!", error: "×"};
 	const version = ++saveNotificationVersion;
 
 	if (saveNotificationTimer) clearTimeout(saveNotificationTimer);
@@ -782,9 +782,7 @@ async function saveArtwork() {
 		showSaveNotification(`Saved to Downloads/${result.branchFolder}/`, "success");
 		return result;
 	} catch (error) {
-		logger.warn
-			? logger.warn("Branch-folder save unavailable; using browser download", error)
-			: logger.log("Branch-folder save unavailable; using browser download", error);
+		logger.warn ? logger.warn("Branch-folder save unavailable; using browser download", error) : logger.log("Branch-folder save unavailable; using browser download", error);
 		try {
 			downloadArtwork(canvasEl, fileName);
 			showSaveNotification("Browser download started (branch folder unavailable)", "warning", 5000);
