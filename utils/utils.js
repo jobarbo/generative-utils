@@ -677,8 +677,20 @@ function fitDisplayToViewport() {
 	}
 }
 
-// make a function to save the canvas as a png file with the git branch name and a timestamp
-function saveArtwork() {
+function downloadArtwork(canvasEl, fileName) {
+	const imageUrl = canvasEl.toDataURL("image/png").replace("image/png", "image/octet-stream");
+	const a = document.createElement("a");
+	a.href = imageUrl;
+	a.setAttribute("download", fileName);
+	a.click();
+}
+
+/**
+ * Save through the local development server so it can create
+ * Downloads/<current-git-branch>. Static/production builds fall back to a
+ * normal browser download because browsers cannot write to Downloads folders.
+ */
+async function saveArtwork() {
 	const logger = window.Logger || console;
 	var output_hash = fxhash;
 	logger.debug ? logger.debug("Hash for save: " + output_hash) : logger.log("Hash for save:", output_hash);
@@ -692,14 +704,34 @@ function saveArtwork() {
 	}
 	var fileName = datestring + ".png";
 
-	// Standard download for other browsers
-	const imageUrl = canvasEl.toDataURL("image/png").replace("image/png", "image/octet-stream");
-	const a = document.createElement("a");
-	a.href = imageUrl;
-	a.setAttribute("download", fileName);
-	a.click();
+	try {
+		const png = await new Promise((resolve, reject) => {
+			canvasEl.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Canvas PNG encoding failed"))), "image/png");
+		});
+		const response = await fetch("/__fx-save-artwork", {
+			method: "POST",
+			headers: {
+				"Content-Type": "image/png",
+				"X-Artwork-Filename": encodeURIComponent(fileName),
+			},
+			body: png,
+		});
+		const contentType = response.headers.get("content-type") || "";
+		if (!response.ok || !contentType.includes("application/json")) {
+			throw new Error(`Local save endpoint unavailable (${response.status})`);
+		}
 
-	logger.success ? logger.success("Saved " + fileName) : logger.log("saved " + fileName);
+		const result = await response.json();
+		if (!result.outputPath) throw new Error(result.error || "Local save endpoint returned an invalid response");
+		logger.success ? logger.success("Saved " + result.outputPath) : logger.log("saved " + result.outputPath);
+		return result;
+	} catch (error) {
+		logger.warn
+			? logger.warn("Branch-folder save unavailable; using browser download", error)
+			: logger.log("Branch-folder save unavailable; using browser download", error);
+		downloadArtwork(canvasEl, fileName);
+		return null;
+	}
 }
 
 // Create and show download button (only if not in iframe)
