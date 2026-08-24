@@ -685,6 +685,59 @@ function downloadArtwork(canvasEl, fileName) {
 	a.click();
 }
 
+let saveNotificationTimer = null;
+let saveNotificationVersion = 0;
+
+function showSaveNotification(message, type = "info", duration = 3500) {
+	let notification = document.getElementById("save-artwork-notification");
+	if (!notification) {
+		notification = document.createElement("div");
+		notification.id = "save-artwork-notification";
+		notification.setAttribute("aria-live", "polite");
+		document.body.appendChild(notification);
+	}
+
+	const colors = {
+		info: "rgba(24, 28, 36, 0.94)",
+		success: "rgba(24, 112, 67, 0.96)",
+		warning: "rgba(153, 94, 14, 0.96)",
+		error: "rgba(158, 43, 43, 0.96)",
+	};
+	const icons = { info: "…", success: "✓", warning: "!", error: "×" };
+	const version = ++saveNotificationVersion;
+
+	if (saveNotificationTimer) clearTimeout(saveNotificationTimer);
+	notification.setAttribute("role", type === "error" ? "alert" : "status");
+	notification.textContent = `${icons[type] || icons.info} ${message}`;
+	notification.style.cssText = `
+		position: fixed;
+		left: 50%;
+		bottom: 24px;
+		z-index: 100000;
+		max-width: min(520px, calc(100vw - 32px));
+		box-sizing: border-box;
+		padding: 11px 16px;
+		border: 1px solid rgba(255, 255, 255, 0.24);
+		border-radius: 8px;
+		background: ${colors[type] || colors.info};
+		box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+		color: white;
+		font: 600 13px/1.4 "Courier New", monospace;
+		text-align: center;
+		pointer-events: none;
+		transform: translateX(-50%);
+		opacity: 1;
+		transition: opacity 180ms ease;
+	`;
+
+	if (duration > 0) {
+		saveNotificationTimer = setTimeout(() => {
+			if (version !== saveNotificationVersion) return;
+			notification.style.opacity = "0";
+		}, duration);
+	}
+}
+
 /**
  * Save through the local development server so it can create
  * Downloads/<current-git-branch>. Static/production builds fall back to a
@@ -700,9 +753,11 @@ async function saveArtwork() {
 	logger.debug ? logger.debug("Canvas element: " + (canvasEl ? "Found" : "Not found")) : logger.log("Canvas element:", canvasEl);
 	if (!canvasEl) {
 		logger.error ? logger.error("Save failed: no canvas found") : logger.error("Save failed: no canvas found");
+		showSaveNotification("Save failed: no canvas found", "error");
 		return;
 	}
 	var fileName = datestring + ".png";
+	showSaveNotification("Saving artwork…", "info", 0);
 
 	try {
 		const png = await new Promise((resolve, reject) => {
@@ -724,13 +779,21 @@ async function saveArtwork() {
 		const result = await response.json();
 		if (!result.outputPath) throw new Error(result.error || "Local save endpoint returned an invalid response");
 		logger.success ? logger.success("Saved " + result.outputPath) : logger.log("saved " + result.outputPath);
+		showSaveNotification(`Saved to Downloads/${result.branchFolder}/`, "success");
 		return result;
 	} catch (error) {
 		logger.warn
 			? logger.warn("Branch-folder save unavailable; using browser download", error)
 			: logger.log("Branch-folder save unavailable; using browser download", error);
-		downloadArtwork(canvasEl, fileName);
-		return null;
+		try {
+			downloadArtwork(canvasEl, fileName);
+			showSaveNotification("Browser download started (branch folder unavailable)", "warning", 5000);
+			return null;
+		} catch (downloadError) {
+			logger.error ? logger.error("Save failed: " + downloadError.message) : logger.log("Save failed", downloadError);
+			showSaveNotification("Save failed", "error", 5000);
+			return null;
+		}
 	}
 }
 

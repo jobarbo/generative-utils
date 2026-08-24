@@ -6,6 +6,7 @@ uniform sampler2D uTexture;
 uniform float uTime;
 uniform float uSeed;
 uniform float uAmount; // grain intensity [0..1]
+uniform float uGrainSize; // visual grain size multiplier (1 = original look)
 // Spatial threshold (UV 0-1): grain visible only inside the rectangle
 uniform float uThresholdMinX; // left edge [0..1]
 uniform float uThresholdMaxX; // right edge [0..1]
@@ -31,7 +32,10 @@ void main() {
 		* (1.0 - smoothstep(uThresholdMaxY - smoothWidth, uThresholdMaxY, uv.y));
 	amount *= inRangeX * inRangeY;
 
-	vec2 noise_uv = uv * 128.0;
+	// Divide the sampling frequency so larger values create visibly larger grain.
+	// A value of 1.0 preserves the shader's original appearance.
+	float grainSize = max(uGrainSize, 0.05);
+	vec2 noise_uv = uv * (128.0 / grainSize);
 	float angle = 0.25;
 	float cos_a = cos(angle);
 	float sin_a = sin(angle);
@@ -58,5 +62,4 @@ void main() {
 
 	gl_FragColor = color;
 }
-
 

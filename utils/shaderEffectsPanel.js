@@ -967,6 +967,7 @@ class ShaderEffectsPanel {
 			tilesize2: {min: 1, max: 512, step: 1, integer: true},
 			tilesize3: {min: 1, max: 512, step: 1, integer: true},
 			cellsize: {min: 1, max: 64, step: 0.1}, // crtDisplay — px @ short-edge 1000
+			grainsize: {min: 0.25, max: 8, step: 0.05}, // 1 = original grain frequency
 			scale: {min: 1, max: 64, step: 0.25}, // dither pattern cell — px @ short-edge 1000
 			bluramount: {min: 0, max: 128, step: 0.1}, // gaussian/directional @ REF 1000; radial is UV×0.01
 			sortamount: {min: 0, max: 18, step: 0.1},
@@ -1139,6 +1140,7 @@ class ShaderEffectsPanel {
 			filtermode: "filter mode (0–1)",
 			blurquality: "blur quality",
 			blurdirection: "blur direction",
+			grainsize: "grain size",
 			levels: "levels (2–256)",
 		};
 		if (labels[k]) return labels[k];
