@@ -28,6 +28,12 @@ General-purpose utilities for generative art:
 - Animation helpers: `createAnimationGenerator()`, `startAnimation()`
 - Execution timing: `ExecutionTimer` class
 
+In the local development server, `saveArtwork()` (including Cmd/Ctrl+S) writes
+PNG files to `~/Downloads/<current-git-branch>/` and creates the directory when
+needed. Slashes and other filesystem-reserved branch-name characters become
+hyphens. Static and production builds retain the normal browser download
+fallback.
+
 #### **logs.js**
 
 Enhanced console logging with styled output:
