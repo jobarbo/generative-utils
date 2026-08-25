@@ -41,6 +41,21 @@
 		},
 	};
 
+	function randomFxHash() {
+		const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+		let hash = "oo";
+		for (let i = 0; i < 49; i++) {
+			hash += alphabet[(Math.random() * alphabet.length) | 0];
+		}
+		return hash;
+	}
+
+	function generateNewPiece() {
+		const url = new URL(root.location.href);
+		url.searchParams.set("fxhash", randomFxHash());
+		root.location.assign(url.toString());
+	}
+
 	function getParams() {
 		return root.PARAMS_UI;
 	}
@@ -56,7 +71,8 @@
 			if (!raw) return false;
 			const data = JSON.parse(raw);
 			if (!data || data.version !== 1 || !data.current || typeof data.current !== "object") return false;
-			p.current = {...p.current, ...data.current};
+			if (data.kind && data.kind !== "params-panel") return false;
+			applyCurrentSnapshot(p, data.current);
 			return true;
 		} catch (error) {
 			console.warn("[ParamsPanel] loadPersistedControls failed:", error);
@@ -64,12 +80,65 @@
 		}
 	}
 
+	function snapshotCurrent(p) {
+		return {version: 1, kind: "params-panel", current: {...p.current}};
+	}
+
 	function savePersistedControls(p) {
 		if (!controlsPersistEnabled() || !p?.current) return;
 		try {
-			localStorage.setItem(CONTROLS_STORAGE_KEY, JSON.stringify({version: 1, current: {...p.current}}));
+			localStorage.setItem(CONTROLS_STORAGE_KEY, JSON.stringify(snapshotCurrent(p)));
 		} catch (error) {
 			console.warn("[ParamsPanel] savePersistedControls failed:", error);
+		}
+	}
+
+	function exportTimestamp() {
+		const d = new Date();
+		const pad = (n) => String(n).padStart(2, "0");
+		return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` + `-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+	}
+
+	function coerceImportedValue(currentValue, raw) {
+		if (typeof currentValue === "number") {
+			const num = String(raw).includes(".") ? parseFloat(raw) : parseInt(raw, 10);
+			return Number.isNaN(num) ? currentValue : num;
+		}
+		return raw;
+	}
+
+	function applyCurrentSnapshot(p, incoming) {
+		if (!incoming || typeof incoming !== "object") return false;
+		let applied = 0;
+		for (const key of Object.keys(p.current)) {
+			if (!(key in incoming)) continue;
+			p.current[key] = coerceImportedValue(p.current[key], incoming[key]);
+			applied += 1;
+		}
+		return applied > 0;
+	}
+
+	function readControlsIntoCurrent(controls, uiDefs, p) {
+		for (const def of uiDefs) {
+			const key = def.key;
+			const select = controls[key];
+			if (!(select instanceof HTMLSelectElement)) continue;
+
+			const raw = select.value;
+			if (def.kind === "palette") {
+				p.current[key] = raw === "(random)" ? "" : raw;
+				continue;
+			}
+
+			const currentValue = p.current[key];
+			if (typeof currentValue === "number") {
+				const num = raw.includes(".") ? parseFloat(raw) : parseInt(raw, 10);
+				if (!Number.isNaN(num)) {
+					p.current[key] = num;
+				}
+			} else {
+				p.current[key] = raw;
+			}
 		}
 	}
 
@@ -445,6 +514,7 @@
 		}
 
 		const toggle = document.querySelector(".info-toggle");
+		const generateBtn = document.getElementById("param-generate");
 		const container = document.querySelector(".container");
 		if (toggle && container) {
 			toggle.classList.add("show");
@@ -453,6 +523,18 @@
 				const isOpen = container.classList.toggle("show");
 				toggle.textContent = isOpen ? "Close tab" : "Edit parameters";
 			});
+		}
+		if (generateBtn) {
+			const hideGenerate = typeof isInIframe === "function" && isInIframe();
+			if (hideGenerate) {
+				generateBtn.hidden = true;
+			} else {
+				generateBtn.classList.add("show");
+				generateBtn.addEventListener("click", (e) => {
+					e.preventDefault();
+					generateNewPiece();
+				});
+			}
 		}
 
 		const form = document.querySelector(".controls-form");
@@ -549,27 +631,7 @@
 			await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 
 			try {
-				for (const def of uiDefs) {
-					const key = def.key;
-					const select = controls[key];
-					if (!(select instanceof HTMLSelectElement)) continue;
-
-					const raw = select.value;
-					if (def.kind === "palette") {
-						p.current[key] = raw === "(random)" ? "" : raw;
-						continue;
-					}
-
-					const currentValue = p.current[key];
-					if (typeof currentValue === "number") {
-						const num = raw.includes(".") ? parseFloat(raw) : parseInt(raw, 10);
-						if (!Number.isNaN(num)) {
-							p.current[key] = num;
-						}
-					} else {
-						p.current[key] = raw;
-					}
-				}
+				readControlsIntoCurrent(controls, uiDefs, p);
 
 				if (typeof root.resolveParams === "function") root.resolveParams();
 				savePersistedControls(p);
@@ -601,6 +663,76 @@
 				} else {
 					setText(".kb-params.dashboard", "download not ready");
 				}
+			});
+		}
+
+		const btnExportJson = document.getElementById("param-export-json");
+		const btnImportJson = document.getElementById("param-import-json");
+		const importFileInput = document.getElementById("param-import-file");
+
+		if (btnExportJson) {
+			btnExportJson.addEventListener("click", (e) => {
+				e.preventDefault();
+				readControlsIntoCurrent(controls, uiDefs, p);
+				const blob = new Blob([JSON.stringify(snapshotCurrent(p), null, 2)], {type: "application/json"});
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = `params-panel-${exportTimestamp()}.json`;
+				a.click();
+				URL.revokeObjectURL(url);
+				console.log("[ParamsPanel] exported settings", a.download);
+			});
+		}
+
+		if (btnImportJson && importFileInput) {
+			btnImportJson.addEventListener("click", (e) => {
+				e.preventDefault();
+				importFileInput.click();
+			});
+
+			importFileInput.addEventListener("change", () => {
+				const file = importFileInput.files?.[0];
+				importFileInput.value = "";
+				if (!file) return;
+
+				const reader = new FileReader();
+				reader.onload = () => {
+					let data;
+					try {
+						data = JSON.parse(String(reader.result || ""));
+					} catch (error) {
+						console.warn("[ParamsPanel] import failed — invalid JSON:", error);
+						setText(".kb-params.dashboard", "import failed");
+						return;
+					}
+
+					if (!data || data.version !== 1 || !data.current || typeof data.current !== "object") {
+						console.warn("[ParamsPanel] import failed — expected version 1 snapshot with current");
+						setText(".kb-params.dashboard", "import failed");
+						return;
+					}
+					if (data.kind && data.kind !== "params-panel") {
+						console.warn("[ParamsPanel] import failed — unexpected kind:", data.kind);
+						setText(".kb-params.dashboard", "import failed");
+						return;
+					}
+
+					if (!applyCurrentSnapshot(p, data.current)) {
+						console.warn("[ParamsPanel] import failed — nothing applied");
+						setText(".kb-params.dashboard", "import failed");
+						return;
+					}
+
+					syncSelectsFromCurrent(controls, uiDefs, p);
+					console.log("[ParamsPanel] imported settings from", file.name);
+					btnApply.click();
+				};
+				reader.onerror = () => {
+					console.warn("[ParamsPanel] import failed — could not read file");
+					setText(".kb-params.dashboard", "import failed");
+				};
+				reader.readAsText(file);
 			});
 		}
 

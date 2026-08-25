@@ -208,10 +208,19 @@ canvas.p5Canvas.presentation.horizontal {
 	border: 0.5px solid rgba(255, 255, 255, 0.65);
 }
 
-.info-toggle {
+.params-toggles {
 	position: absolute;
 	top: 5vh;
 	right: 5vh;
+	z-index: 10003;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 8px;
+}
+
+.info-toggle,
+.generate-toggle {
 	padding: 1.25em 1.5em;
 	display: none;
 	justify-content: center;
@@ -219,8 +228,8 @@ canvas.p5Canvas.presentation.horizontal {
 	cursor: pointer;
 	color: var(--color-text);
 	background-color: black;
+	border: none;
 	border-radius: 5px;
-	z-index: 10003;
 	font-family: helvetica, arial, sans-serif;
 	line-height: 1;
 	font-size: clamp(10px, 0.66vw, 22px);
@@ -229,7 +238,8 @@ canvas.p5Canvas.presentation.horizontal {
 	transition: 0.2s ease-in-out;
 }
 
-.info-toggle.show {
+.info-toggle.show,
+.generate-toggle.show {
 	display: flex;
 	font-family: helvetica, arial, sans-serif;
 	font-weight: 600;
@@ -279,6 +289,34 @@ canvas.p5Canvas.presentation.horizontal {
 	align-items: center;
 	margin-top: clamp(8px, 0.66vw, 14px);
 	gap: 8px;
+}
+
+.params-io-row {
+	display: flex;
+	width: 100%;
+	gap: 8px;
+	margin-top: 2px;
+}
+
+.params-io {
+	flex: 1;
+	height: clamp(28px, 2.2vw, 36px);
+	padding: 0 0.6em;
+	border: 2px solid #000;
+	border-radius: 50px;
+	background: rgba(0, 0, 0, 0.45);
+	color: var(--color-text);
+	font-family: helvetica, arial, sans-serif;
+	font-weight: 600;
+	font-size: clamp(8px, 0.66vw, 16px);
+	cursor: pointer;
+	white-space: nowrap;
+	transition: 0.2s ease-in-out;
+}
+
+.params-io:hover {
+	background: #fff;
+	color: #000;
 }
 
 .persist-clear {
@@ -498,9 +536,13 @@ canvas.p5Canvas.presentation.horizontal {
 		transform: translateY(0%);
 	}
 
-	.info-toggle {
+	.params-toggles {
 		top: 1em;
 		right: 1em;
+	}
+
+	.info-toggle,
+	.generate-toggle {
 		font-size: 14px;
 	}
 

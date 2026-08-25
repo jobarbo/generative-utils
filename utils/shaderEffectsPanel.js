@@ -34,6 +34,7 @@ class ShaderEffectsPanel {
 		}
 
 		this._ensureDom();
+		this._bindToggleButton();
 		this._rebuildDrawers();
 		this._applyVisibility();
 		console.log("[shaderEffectsPanel] ready — press E to toggle (drag ⠿ to reorder)");
@@ -65,6 +66,29 @@ class ShaderEffectsPanel {
 		if (!this.el) return;
 		this.el.classList.toggle("is-hidden", !this.visible);
 		this.el.setAttribute("aria-hidden", this.visible ? "false" : "true");
+		this._syncToggleButton();
+	}
+
+	_bindToggleButton() {
+		const btn = document.getElementById("shader-panel-toggle");
+		if (!btn || btn.dataset.bound) return;
+		if (typeof isInIframe === "function" && isInIframe()) return;
+		btn.dataset.bound = "1";
+		btn.hidden = false;
+		btn.addEventListener("click", (e) => {
+			e.preventDefault();
+			this.toggle();
+		});
+		this._syncToggleButton();
+	}
+
+	_syncToggleButton() {
+		const btn = document.getElementById("shader-panel-toggle");
+		if (!btn) return;
+		btn.classList.toggle("is-active", this.visible);
+		btn.setAttribute("aria-pressed", this.visible ? "true" : "false");
+		btn.setAttribute("aria-label", this.visible ? "Close shader panel" : "Shader panel");
+		btn.title = this.visible ? "Close shader panel (E)" : "Shader panel (E)";
 	}
 
 	/**
