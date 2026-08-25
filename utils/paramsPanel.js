@@ -81,6 +81,11 @@
 		}
 	}
 
+	function snapshotControlDefaults(p) {
+		if (!p?.current || p.defaults) return;
+		p.defaults = JSON.parse(JSON.stringify(p.current));
+	}
+
 	function resetControlsToDefaults(p) {
 		if (!p?.defaults) return;
 		p.current = JSON.parse(JSON.stringify(p.defaults));
@@ -433,6 +438,7 @@
 		const p = getParams();
 		if (!p) return;
 
+		snapshotControlDefaults(p);
 		if (loadPersistedControls(p)) {
 			if (typeof root.resolveParams === "function") root.resolveParams();
 			console.log("[ParamsPanel] restored controls from localStorage");
