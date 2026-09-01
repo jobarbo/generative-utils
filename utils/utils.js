@@ -662,7 +662,7 @@ function fitDisplayToViewport() {
 				typeof getArtworkPaddingNorm === "function"
 					? getArtworkPaddingNorm(typeof width === "number" ? width : 1, typeof height === "number" ? height : 1)
 					: typeof CANVAS_CONFIG !== "undefined"
-						? CANVAS_CONFIG.ARTWORK_PADDING
+						? {x: CANVAS_CONFIG.ARTWORK_PADDING_X, y: CANVAS_CONFIG.ARTWORK_PADDING_Y}
 						: typeof BASE_PADDING !== "undefined"
 							? BASE_PADDING
 							: 0.1;
