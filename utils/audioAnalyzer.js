@@ -52,8 +52,11 @@ class AudioAnalyzer {
 		this.fftSmoothing = 0.8; // kept for API compat; applied via our own smooth()
 
 		// Source type
-		this.sourceType = null; // 'microphone', 'file', 'chime', 'custom'
+		this.sourceType = null; // 'microphone', 's1', 'file', 'chime', 'custom'
 		this.isInitialized = false;
+		this.preferS1 = false;
+		this.micDeviceId = null;
+		this.micDeviceLabel = null;
 
 		// Source perception (updated each frame / on mic open)
 		this.sourceError = null;
@@ -171,7 +174,7 @@ class AudioAnalyzer {
 
 	/**
 	 * Initialize audio analyzer
-	 * @param {string} source - 'microphone', 'chime', or provide a p5.SoundFile
+	 * @param {string} source - 'microphone' | 's1' | 'chime' | p5.SoundFile | custom node
 	 * @param {object} options - Configuration options
 	 */
 	init(source = "microphone", options = {}) {
@@ -186,6 +189,7 @@ class AudioAnalyzer {
 		if (options.beatThreshold !== undefined) this.beatThreshold = options.beatThreshold;
 		if (options.sensitivity !== undefined) this.sensitivity = options.sensitivity;
 		if (options.levelCurve !== undefined) this.levelCurve = options.levelCurve;
+		if (options.deviceId) this.micDeviceId = options.deviceId;
 
 		const fftSize = this._normalizeFftSize(this.fftBands);
 		this.fftBands = fftSize;
@@ -193,8 +197,9 @@ class AudioAnalyzer {
 		// p5.sound 0.2+: constructor is FFT(fftSize) only
 		this.fft = new p5.FFT(fftSize);
 
-		if (source === "microphone") {
-			this.sourceType = "microphone";
+		if (source === "microphone" || source === "s1") {
+			this.sourceType = source;
+			this.preferS1 = source === "s1" || !!options.preferS1;
 			this.micOpened = false;
 			this.sourceError = null;
 			this.mic = new p5.AudioIn();
@@ -227,6 +232,46 @@ class AudioAnalyzer {
 		return this;
 	}
 
+	/** Match Roland S-1 USB audio labels (from s1_dashboard). */
+	static isLikelyS1AudioDevice(label) {
+		const n = String(label || "").toLowerCase();
+		return (
+			/s-?1/.test(n) ||
+			(/digital audio interface/.test(n) && /s-?1|aira|compact/.test(n)) ||
+			/aira\s*compact/.test(n)
+		);
+	}
+
+	async _resolveInputDeviceId() {
+		if (this.micDeviceId) return this.micDeviceId;
+		if (!this.preferS1) return undefined;
+		if (!navigator.mediaDevices?.enumerateDevices) return undefined;
+
+		try {
+			let devices = await navigator.mediaDevices.enumerateDevices();
+			if (devices.every((d) => !d.label)) {
+				// Labels empty until permission — open briefly then re-enumerate
+				try {
+					const tmp = await navigator.mediaDevices.getUserMedia({audio: true});
+					tmp.getTracks().forEach((t) => t.stop());
+					devices = await navigator.mediaDevices.enumerateDevices();
+				} catch (_) {
+					/* ignore */
+				}
+			}
+			const inputs = devices.filter((d) => d.kind === "audioinput");
+			const s1 = inputs.find((d) => AudioAnalyzer.isLikelyS1AudioDevice(d.label));
+			if (s1) {
+				this.micDeviceLabel = s1.label;
+				return s1.deviceId;
+			}
+			console.warn("[AudioAnalyzer] S-1 USB audio not found — falling back to default input");
+		} catch (err) {
+			console.warn("[AudioAnalyzer] enumerateDevices failed:", err);
+		}
+		return undefined;
+	}
+
 	/**
 	 * Wire mic → FFT without speakers (avoids feedback).
 	 */
@@ -245,32 +290,68 @@ class AudioAnalyzer {
 	}
 
 	/**
-	 * Attempt to open the microphone (may no-op until a user gesture).
+	 * Attempt to open the microphone / S-1 USB input (may no-op until a user gesture).
 	 */
-	_startMicrophone() {
+	async _startMicrophone() {
 		if (!this.mic) return;
-
-		const ac = typeof getAudioContext === "function" ? getAudioContext() : null;
-		if (ac && ac.state !== "running") {
-			ac.resume().catch(() => {});
-		}
-		if (typeof userStartAudio === "function") {
-			try {
-				userStartAudio();
-			} catch (_) {
-				/* ignore */
-			}
-		}
+		if (this._startInFlight) return;
+		this._startInFlight = true;
 
 		try {
-			this.mic.start();
-		} catch (err) {
-			this.sourceError = err?.message || String(err);
-			console.error("[AudioAnalyzer] Microphone start failed:", err);
-			return;
-		}
+			const ac = typeof getAudioContext === "function" ? getAudioContext() : null;
+			if (ac && ac.state !== "running") {
+				ac.resume().catch(() => {});
+			}
+			if (typeof userStartAudio === "function") {
+				try {
+					userStartAudio();
+				} catch (_) {
+					/* ignore */
+				}
+			}
 
-		this._watchMicOpen();
+			const deviceId = await this._resolveInputDeviceId();
+			const um = this.mic.node;
+
+			const onOpen = () => {
+				this._watchMicOpen();
+			};
+			const onFail = (err) => {
+				this.sourceError = err?.message || String(err);
+				console.error("[AudioAnalyzer] Audio input open failed:", err);
+				// Fallback to default input once if a specific device was requested
+				if (deviceId && um?.open) {
+					console.warn("[AudioAnalyzer] retrying default audio input");
+					um.open()
+						.then(onOpen)
+						.catch((err2) => {
+							this.sourceError = err2?.message || String(err2);
+							console.error("[AudioAnalyzer] Default input also failed:", err2);
+						});
+				}
+			};
+
+			if (um && typeof um.open === "function") {
+				const openPromise = deviceId ? um.open(deviceId) : um.open();
+				openPromise
+					.then(() => {
+						if (deviceId && this.micDeviceLabel) {
+							console.log(`[AudioAnalyzer] opened "${this.micDeviceLabel}"`);
+						}
+						onOpen();
+					})
+					.catch(onFail);
+			} else {
+				try {
+					this.mic.start();
+					onOpen();
+				} catch (err) {
+					onFail(err);
+				}
+			}
+		} finally {
+			this._startInFlight = false;
+		}
 	}
 
 	/**
@@ -281,9 +362,13 @@ class AudioAnalyzer {
 		this._unlockBound = true;
 
 		const unlock = (e) => {
-			// Ignore UI overlays (debug / shader panels, controls) — only canvas/page unlocks mic
+			// Ignore UI overlays — only canvas/page unlocks mic
 			const t = e?.target;
-			if (t?.closest?.("#debug-panel, #shader-effects-panel, #controls, button, input, label, select, textarea")) {
+			if (
+				t?.closest?.(
+					"#debug-panel, #shader-effects-panel, #scene-panel, #controls, button, input, label, select, textarea",
+				)
+			) {
 				return;
 			}
 			this.sourceError = null;
@@ -306,7 +391,10 @@ class AudioAnalyzer {
 					this.micOpened = true;
 					this.sourceError = null;
 					this._wireMicToFft();
-					console.log("[AudioAnalyzer] Microphone open — routed to FFT");
+					console.log(
+						`[AudioAnalyzer] ${this.sourceType === "s1" ? "S-1 / " : ""}input open — routed to FFT` +
+							(this.micDeviceLabel ? ` (${this.micDeviceLabel})` : ""),
+					);
 				}
 				return true;
 			}
@@ -340,7 +428,7 @@ class AudioAnalyzer {
 			return {code: "denied", label: "source denied", ok: false, receiving: false};
 		}
 
-		if (this.sourceType === "microphone") {
+		if (this.sourceType === "microphone" || this.sourceType === "s1") {
 			const umState = this.mic?.node?.state;
 			if (umState === "started") {
 				if (!this.micOpened) {
@@ -349,7 +437,8 @@ class AudioAnalyzer {
 				}
 			}
 			if (!this.micOpened) {
-				return {code: "waiting", label: "click page to enable mic", ok: false, receiving: false};
+				const hint = this.preferS1 ? "click page to enable S-1 audio" : "click page to enable mic";
+				return {code: "waiting", label: hint, ok: false, receiving: false};
 			}
 		}
 
@@ -369,7 +458,7 @@ class AudioAnalyzer {
 		}
 
 		// Keep trying to attach mic if permission landed mid-session
-		if (this.sourceType === "microphone" && this.mic?.node?.state === "started") {
+		if ((this.sourceType === "microphone" || this.sourceType === "s1") && this.mic?.node?.state === "started") {
 			if (!this.micOpened) {
 				this.micOpened = true;
 				this._wireMicToFft();

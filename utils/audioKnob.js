@@ -72,8 +72,8 @@ class AudioKnob {
 
 	/**
 	 * Initialize with audio source
-	 * @param {string} source - 'microphone' | 'chime'
-	 * @param {object} options - passed to audioAnalyzer.init() { fftBands, fftSmoothing, smoothing, beatThreshold }
+	 * @param {string} source - 'microphone' | 's1' | 'chime'
+	 * @param {object} options - passed to audioAnalyzer.init() { fftBands, fftSmoothing, smoothing, beatThreshold, deviceId, preferS1 }
 	 * @returns {AudioKnob} this (for chaining)
 	 */
 	setSource(source = "microphone", options = {}) {

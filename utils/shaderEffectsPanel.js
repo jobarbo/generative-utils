@@ -1207,6 +1207,7 @@ class ShaderEffectsPanel {
 		nameEl.textContent = labelText;
 
 		let liveDot = null;
+		let learnBtn = null;
 		if (componentIndex == null) {
 			liveDot = document.createElement("button");
 			liveDot.type = "button";
@@ -1217,6 +1218,28 @@ class ShaderEffectsPanel {
 				e.stopPropagation();
 				this._toggleLiveOverride(effectName, key);
 				this._refreshLiveIndicator(effectName, key, control);
+			});
+
+			learnBtn = document.createElement("button");
+			learnBtn.type = "button";
+			learnBtn.className = "shader-effects-panel__apply";
+			learnBtn.style.cssText = "margin-left:4px;padding:0 6px;font-size:9px;";
+			learnBtn.title = "Bind the next MIDI CC turned to this param (overrides S-1 preset for that CC)";
+			learnBtn.textContent = "learn";
+			learnBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				const midi = typeof window !== "undefined" ? window.midiLearn || window.sceneMidi : null;
+				if (!midi || typeof midi.startLearn !== "function") return;
+				const learningThis = midi.learning?.effect === effectName && midi.learning?.param === key;
+				if (learningThis) {
+					midi.cancelLearn();
+					learnBtn.textContent = "learn";
+				} else {
+					midi.startLearn(effectName, key, () => {
+						learnBtn.textContent = "learn";
+					});
+					learnBtn.textContent = "…";
+				}
 			});
 		}
 
@@ -1233,6 +1256,7 @@ class ShaderEffectsPanel {
 		if (liveDot) meta.appendChild(liveDot);
 		meta.appendChild(nameEl);
 		meta.appendChild(numberInput);
+		if (learnBtn) meta.appendChild(learnBtn);
 
 		const slider = document.createElement("input");
 		slider.type = "range";
