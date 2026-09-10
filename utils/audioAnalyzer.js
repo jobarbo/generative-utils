@@ -366,7 +366,7 @@ class AudioAnalyzer {
 			const t = e?.target;
 			if (
 				t?.closest?.(
-					"#debug-panel, #shader-effects-panel, #scene-panel, #controls, button, input, label, select, textarea",
+					"#debug-panel, #shader-effects-panel, #scene-panel, #midi-panel, #controls, button, input, label, select, textarea",
 				)
 			) {
 				return;
