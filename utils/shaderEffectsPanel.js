@@ -931,6 +931,7 @@ class ShaderEffectsPanel {
 			k === "debug" ||
 			k === "translationenabled" ||
 			k === "rotationenabled" ||
+			k === "lockgridsize" ||
 			k === "animatezoom" ||
 			k === "aspectcorrect" ||
 			k === "blurcrt" ||
@@ -997,6 +998,7 @@ class ShaderEffectsPanel {
 			sortamount: {min: 0, max: 18, step: 0.1},
 			translationspeedx: {min: 0, max: 5, step: 0.01},
 			translationspeedy: {min: 0, max: 5, step: 0.01},
+			translationamount: {min: -1, max: 1, step: 0.001},
 			spiralamount: {min: 0, max: 3, step: 0.01},
 			spiralfrequency: {min: 0, max: 48, step: 0.1},
 			spiralspeed: {min: 0, max: 5, step: 0.01},
@@ -1115,6 +1117,7 @@ class ShaderEffectsPanel {
 			debug: "debug (guides)",
 			translationEnabled: "translation",
 			rotationEnabled: "rotation",
+			lockGridSize: "lock pixel X/Y",
 			animateZoom: "animate zoom",
 			aspectCorrect: "aspect correct",
 			blurCrt: "blur CRT shape",
@@ -1177,6 +1180,9 @@ class ShaderEffectsPanel {
 		const rgb = ["R", "G", "B"];
 		const rgba = ["R", "G", "B", "A"];
 
+		if (k === "translationamount" && componentCount === 2) {
+			return `translation amount ${axis2[componentIndex] || componentIndex}`;
+		}
 		if (k === "gridsize" && componentCount === 2) {
 			return `pixel ${axis2[componentIndex] || componentIndex}`;
 		}
@@ -1420,14 +1426,45 @@ class ShaderEffectsPanel {
 		const effect = this.shaderEffects?.effectsConfig?.[effectName];
 		if (!effect) return;
 
+		if (key === "lockGridSize" && num > 0.5) {
+			const size = Array.isArray(effect.gridSize) ? [...effect.gridSize] : [24, 24];
+			size[1] = size[0];
+			this.shaderEffects.updateEffectParam(effectName, "gridSize", size);
+			this._syncGridSizeControls(effectName, size);
+		}
+
 		if (componentIndex != null) {
 			const current = Array.isArray(effect[key]) ? [...effect[key]] : Array(componentCount).fill(0);
-			current[componentIndex] = num;
-			this.shaderEffects.updateEffectParam(effectName, key, current);
+			if (key === "gridSize" && Number(effect.lockGridSize) > 0.5) {
+				current[0] = num;
+				current[1] = num;
+				this.shaderEffects.updateEffectParam(effectName, key, current);
+				this._syncGridSizeControls(effectName, current);
+			} else {
+				current[componentIndex] = num;
+				this.shaderEffects.updateEffectParam(effectName, key, current);
+			}
 		} else {
 			this.shaderEffects.updateEffectParam(effectName, key, num);
 		}
 		this._scheduleSave();
+	}
+
+	/**
+	 * Keep pixel X/Y sliders in sync when lockGridSize is on.
+	 * @param {string} effectName
+	 * @param {number[]} size
+	 */
+	_syncGridSizeControls(effectName, size) {
+		const drawer = this.drawers.get(effectName);
+		if (!drawer?.inputs || !Array.isArray(size)) return;
+		for (let i = 0; i < 2; i++) {
+			const control = drawer.inputs.get(`gridSize.${i}`);
+			if (!control) continue;
+			const v = size[i];
+			if (control.input) control.input.value = String(v);
+			if (control.numberInput) control.numberInput.value = this._formatValue(v);
+		}
 	}
 
 	_persistEnabled() {

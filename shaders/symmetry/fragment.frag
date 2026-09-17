@@ -25,6 +25,7 @@ uniform float uTranslationMode; // 0=sine, 1=noise, 2=FBM, 3=vector field, 4=con
 uniform float uRotationMode; // 0=cosine, 1=noise, 2=FBM
 uniform float uTranslationNoiseScale; // scale of noise variation (lower = smoother, higher = more frequent changes)
 uniform float uRotationNoiseScale; // scale of rotation noise (lower = smoother, higher = more frequent changes)
+uniform vec2 uTranslationAmount; // static UV offset (panel: translation amount, applied even when animation is off)
 
 float random(vec2 st, float seed) {
 	return fract(sin(dot(st.xy + seed, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -209,43 +210,46 @@ void main() {
 	// Apply translation and rotation to the source image - this moves the image under the symmetry
 	// The symmetry folds stay in the same place, but different parts of the image pass through
 
-	// Translation: apply mode-based offset (affects entire canvas uniformly, no per-pixel deformation)
-	vec2 offset = vec2(0.0);
+	// Static base offset always applies (panel: translation amount X/Y)
+	// Animated translation is added only when uTranslationEnabled is on
+	vec2 offset = uTranslationAmount;
 
 	if (uTranslationEnabled > 0.5 && (abs(uTranslationSpeedX) > 0.001 || abs(uTranslationSpeedY) > 0.001)) {
 		float moveAmount = 1.0; // Fixed amplitude - speed controls phase accumulation rate, not amplitude
 		int transMode = int(uTranslationMode);
+		vec2 animated = vec2(0.0);
 
 		if (transMode == 0) {
-			offset = vec2(
+			animated = vec2(
 				sin(uTranslationPhaseX) * 0.3,
 				cos(uTranslationPhaseY) * 0.3
 			);
 		} else if (transMode == 1) {
 			float noiseX = noise(vec2(uTranslationPhaseX, 0.0)) * 2.0 - 1.0;
 			float noiseY = noise(vec2(uTranslationPhaseY, 100.0)) * 2.0 - 1.0;
-			offset = vec2(noiseX, noiseY) * moveAmount;
+			animated = vec2(noiseX, noiseY) * moveAmount;
 		} else if (transMode == 2) {
 			float fbmX = fbm(vec2(uTranslationPhaseX, 0.0), uTranslationPhaseX) * 2.0 - 1.0;
 			float fbmY = fbm(vec2(uTranslationPhaseY, 100.0), uTranslationPhaseY) * 2.0 - 1.0;
-			offset = vec2(fbmX, fbmY) * moveAmount;
+			animated = vec2(fbmX, fbmY) * moveAmount;
 		} else if (transMode == 3) {
 			vec2 vfX = vectorField(vec2(0.5), uTranslationPhaseX);
 			vec2 vfY = vectorField(vec2(0.5, 0.6), uTranslationPhaseY);
-			offset = vec2(vfX.x, vfY.y) * moveAmount;
+			animated = vec2(vfX.x, vfY.y) * moveAmount;
 		} else if (transMode == 4) {
 			// Continuous scroll: phase advances one way; mirrorRepeat wraps UV so it loops
 			// seamlessly (no back-and-forth). Speed X/Y control scroll rate per axis.
-			offset = vec2(uTranslationPhaseX, uTranslationPhaseY);
+			animated = vec2(uTranslationPhaseX, uTranslationPhaseY);
 		} else {
-			offset = vec2(
+			animated = vec2(
 				sin(uTranslationPhaseX) * 0.3,
 				cos(uTranslationPhaseY) * 0.3
 			);
 		}
 
-		if (abs(uTranslationSpeedX) <= 0.001) offset.x = 0.0;
-		if (abs(uTranslationSpeedY) <= 0.001) offset.y = 0.0;
+		if (abs(uTranslationSpeedX) <= 0.001) animated.x = 0.0;
+		if (abs(uTranslationSpeedY) <= 0.001) animated.y = 0.0;
+		offset += animated;
 	}
 
 	// Static base angle always applies (panel: rotation amount 0–360° → radians via uniform)
