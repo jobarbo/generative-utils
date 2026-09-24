@@ -104,9 +104,10 @@ class AudioKnob {
 	 * @param {number} [inMax=1] - upper bound of the input feature. Lower this if quiet passages still hit the max.
 	 * @param {number} [exponent=1] - applied to normalized input before mapping: use 1.5–3 to soften peaks (less time stuck at max), or 0.5–0.8 to make hits punch harder.
 	 * @param {number} [stepFrom] - if set (0–1), output stays at outMin until normalized input reaches this fraction, then ramps to outMax over the remainder. Example: 0.5 = no increase until halfway through the input range.
+	 * @param {number} [smooth] - exponential follow on the mapped output, 0–1. Higher glides more. The output still reaches outMin/outMax; it just gets there slower. Omit for an instant write.
 	 * @returns {AudioKnob} this (for chaining)
 	 */
-	map(audioFeature, effectName, paramName, outMin, outMax, inMin = 0, inMax = 1, exponent = 1, stepFrom = undefined) {
+	map(audioFeature, effectName, paramName, outMin, outMax, inMin = 0, inMax = 1, exponent = 1, stepFrom = undefined, smooth = undefined) {
 		this.mappings.push({
 			audioFeature,
 			effectName,
@@ -117,6 +118,8 @@ class AudioKnob {
 			inMax,
 			exponent,
 			stepFrom,
+			smooth,
+			current: null,
 		});
 		return this;
 	}
@@ -191,7 +194,13 @@ class AudioKnob {
 			if (exp !== 1 && t > 0) {
 				t = Math.pow(t, exp);
 			}
-			const mapped = map(t, 0, 1, m.outMin, m.outMax, true);
+			let mapped = map(t, 0, 1, m.outMin, m.outMax, true);
+			const smooth = m.smooth;
+			if (smooth !== undefined && smooth !== null && !Number.isNaN(smooth) && smooth > 0) {
+				const keep = Math.max(0, Math.min(0.99, smooth));
+				m.current = m.current == null ? mapped : m.current * keep + mapped * (1 - keep);
+				mapped = m.current;
+			}
 			shaderEffects.updateEffectParam(m.effectName, m.paramName, mapped);
 		}
 	}
