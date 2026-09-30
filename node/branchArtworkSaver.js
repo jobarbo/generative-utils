@@ -1,4 +1,3 @@
-const { execFileSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -6,19 +5,28 @@ const path = require("path");
 const SAVE_ENDPOINT = "/__fx-save-artwork";
 const MAX_IMAGE_BYTES = 150 * 1024 * 1024;
 
+/**
+ * Branch name from .git/HEAD. Avoids spawning git: this dev server often runs
+ * as x86_64 under Rosetta, and /usr/bin/git then fails in xcrun because the
+ * Command Line Tools dylib is arm64-only.
+ */
 function getCurrentGitBranch(repoRoot) {
-	const branch = execFileSync("git", ["branch", "--show-current"], {
-		cwd: repoRoot,
-		encoding: "utf8",
-	}).trim();
+	let gitPath = path.join(repoRoot, ".git");
+	const stat = fs.lstatSync(gitPath);
 
-	if (branch) return branch;
+	if (stat.isFile()) {
+		const contents = fs.readFileSync(gitPath, "utf8").trim();
+		const gitdir = contents.match(/^gitdir:\s*(.+)$/);
+		if (!gitdir) throw new Error("Unrecognized .git file");
+		gitPath = path.resolve(path.dirname(gitPath), gitdir[1]);
+	}
 
-	const commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
-		cwd: repoRoot,
-		encoding: "utf8",
-	}).trim();
-	return `detached-${commit}`;
+	const head = fs.readFileSync(path.join(gitPath, "HEAD"), "utf8").trim();
+	const ref = head.match(/^ref:\s+refs\/heads\/(.+)$/);
+	if (ref) return ref[1];
+
+	if (/^[0-9a-f]{7,40}$/i.test(head)) return `detached-${head.slice(0, 7)}`;
+	throw new Error(`Unrecognized git HEAD: ${head}`);
 }
 
 function safePathPart(value, fallback) {
