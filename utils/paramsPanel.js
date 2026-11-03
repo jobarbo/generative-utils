@@ -518,10 +518,12 @@
 		const container = document.querySelector(".container");
 		if (toggle && container) {
 			toggle.classList.add("show");
-			toggle.textContent = "Edit parameters";
+			// icon-only button: the label lives in aria-label / title, the open state in a class
 			toggle.addEventListener("click", () => {
 				const isOpen = container.classList.toggle("show");
-				toggle.textContent = isOpen ? "Close tab" : "Edit parameters";
+				toggle.classList.toggle("is-open", isOpen);
+				toggle.title = isOpen ? "Close tab" : "Edit parameters";
+				toggle.setAttribute("aria-label", toggle.title);
 			});
 		}
 		if (generateBtn) {
