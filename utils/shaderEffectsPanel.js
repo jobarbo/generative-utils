@@ -41,7 +41,13 @@ class ShaderEffectsPanel {
 		return this;
 	}
 
+	_isEmbedded() {
+		return typeof isInIframe === "function" && isInIframe();
+	}
+
 	toggle() {
+		// Embedded (e.g. jbarbeau.art live frame): panel stays closed, key E included
+		if (this._isEmbedded()) return this;
 		this.visible = !this.visible;
 		this._applyVisibility();
 		if (this.visible) this.syncFromConfig();
@@ -50,6 +56,7 @@ class ShaderEffectsPanel {
 	}
 
 	show() {
+		if (this._isEmbedded()) return this;
 		this.visible = true;
 		this._applyVisibility();
 		this.syncFromConfig();
@@ -72,7 +79,7 @@ class ShaderEffectsPanel {
 	_bindToggleButton() {
 		const btn = document.getElementById("shader-panel-toggle");
 		if (!btn || btn.dataset.bound) return;
-		if (typeof isInIframe === "function" && isInIframe()) return;
+		if (this._isEmbedded()) return;
 		btn.dataset.bound = "1";
 		btn.hidden = false;
 		btn.addEventListener("click", (e) => {

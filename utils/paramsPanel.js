@@ -516,7 +516,11 @@
 		const toggle = document.querySelector(".info-toggle");
 		const generateBtn = document.getElementById("param-generate");
 		const container = document.querySelector(".container");
-		if (toggle && container) {
+		const embedded = typeof isInIframe === "function" && isInIframe();
+		if (toggle && embedded) {
+			// Embedded (e.g. jbarbeau.art live frame): no parameter editing
+			toggle.hidden = true;
+		} else if (toggle && container) {
 			toggle.classList.add("show");
 			// icon-only button: the label lives in aria-label / title, the open state in a class
 			toggle.addEventListener("click", () => {
@@ -527,8 +531,7 @@
 			});
 		}
 		if (generateBtn) {
-			const hideGenerate = typeof isInIframe === "function" && isInIframe();
-			if (hideGenerate) {
+			if (embedded) {
 				generateBtn.hidden = true;
 			} else {
 				generateBtn.classList.add("show");
