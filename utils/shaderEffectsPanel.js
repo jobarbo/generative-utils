@@ -815,9 +815,33 @@ class ShaderEffectsPanel {
 			this._removeEffect(effectName);
 		});
 
+		const keyBtn = document.createElement("button");
+		keyBtn.type = "button";
+		keyBtn.className = "shader-effects-panel__clone";
+		keyBtn.title = "Next S-1 key toggles this effect (hold)";
+		keyBtn.textContent = "key";
+		keyBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const s1 = window.s1Midi;
+			if (!s1?.startNoteLearn) return;
+			if (keyBtn.textContent === "…") {
+				s1.cancelNoteLearn();
+				keyBtn.textContent = "key";
+				return;
+			}
+			keyBtn.textContent = "…";
+			s1.startNoteLearn((note) => {
+				keyBtn.textContent = "key";
+				if (note == null) return;
+				s1.setNoteMap(note, effectName, "hold");
+			});
+		});
+
 		summary.appendChild(handle);
 		summary.appendChild(toggle);
 		summary.appendChild(label);
+		summary.appendChild(keyBtn);
 		summary.appendChild(cloneBtn);
 		summary.appendChild(removeBtn);
 
@@ -1112,6 +1136,32 @@ class ShaderEffectsPanel {
 		return {min: Math.min(0, -max * 0.25), max, step: max > 10 ? 0.1 : 0.01, integer: false};
 	}
 
+	_makeLearnButton(effectName, key, extra) {
+		const learnBtn = document.createElement("button");
+		learnBtn.type = "button";
+		learnBtn.className = "shader-effects-panel__apply";
+		learnBtn.style.cssText = "margin-left:4px;padding:0 6px;font-size:9px;";
+		learnBtn.title = "Bind the next MIDI CC turned to this param";
+		learnBtn.textContent = "learn";
+		learnBtn.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const midi = typeof window !== "undefined" ? window.midiLearn || window.sceneMidi : null;
+			if (!midi || typeof midi.startLearn !== "function") return;
+			const learningThis = midi.learning?.effect === effectName && midi.learning?.param === key && midi.learning?.index == extra?.index;
+			if (learningThis) {
+				midi.cancelLearn();
+				learnBtn.textContent = "learn";
+			} else {
+				midi.startLearn(effectName, key, () => {
+					learnBtn.textContent = "learn";
+				}, extra);
+				learnBtn.textContent = "…";
+			}
+		});
+		return learnBtn;
+	}
+
 	_createBoolControl(effectName, key, value) {
 		const root = document.createElement("label");
 		root.className = "shader-effects-panel__control shader-effects-panel__control--bool";
@@ -1142,6 +1192,7 @@ class ShaderEffectsPanel {
 
 		root.appendChild(checkbox);
 		root.appendChild(nameEl);
+		root.appendChild(this._makeLearnButton(effectName, key, {type: "bool", outMin: 0, outMax: 1}));
 
 		return {root, input: checkbox, key, componentIndex: null, bool: true};
 	}
@@ -1219,8 +1270,14 @@ class ShaderEffectsPanel {
 		const nameEl = document.createElement("span");
 		nameEl.textContent = labelText;
 
+		const learnBtn = this._makeLearnButton(effectName, key, {
+			index: componentIndex == null ? undefined : componentIndex,
+			outMin: range.min,
+			outMax: range.max,
+			integer: !!range.integer,
+		});
+
 		let liveDot = null;
-		let learnBtn = null;
 		if (componentIndex == null) {
 			liveDot = document.createElement("button");
 			liveDot.type = "button";
@@ -1233,27 +1290,6 @@ class ShaderEffectsPanel {
 				this._refreshLiveIndicator(effectName, key, control);
 			});
 
-			learnBtn = document.createElement("button");
-			learnBtn.type = "button";
-			learnBtn.className = "shader-effects-panel__apply";
-			learnBtn.style.cssText = "margin-left:4px;padding:0 6px;font-size:9px;";
-			learnBtn.title = "Bind the next MIDI CC turned to this param (overrides S-1 preset for that CC)";
-			learnBtn.textContent = "learn";
-			learnBtn.addEventListener("click", (e) => {
-				e.stopPropagation();
-				const midi = typeof window !== "undefined" ? window.midiLearn || window.sceneMidi : null;
-				if (!midi || typeof midi.startLearn !== "function") return;
-				const learningThis = midi.learning?.effect === effectName && midi.learning?.param === key;
-				if (learningThis) {
-					midi.cancelLearn();
-					learnBtn.textContent = "learn";
-				} else {
-					midi.startLearn(effectName, key, () => {
-						learnBtn.textContent = "learn";
-					});
-					learnBtn.textContent = "…";
-				}
-			});
 		}
 
 		const numberInput = document.createElement("input");
