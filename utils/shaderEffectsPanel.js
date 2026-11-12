@@ -1044,6 +1044,9 @@ class ShaderEffectsPanel {
 			blurmin: {min: 0, max: 1, step: 0.01},
 			blurcrtpower: {min: 1, max: 64, step: 0.1},
 			gapbrightness: {min: 0, max: 1, step: 0.01},
+			hue: {min: 0, max: 360, step: 0.1}, // colorTint — degrees
+			saturation: {min: 0, max: 2, step: 0.01},
+			tintcolor: {min: 0, max: 1, step: 0.001}, // per RGB component
 		};
 
 		if (exact[k]) {
