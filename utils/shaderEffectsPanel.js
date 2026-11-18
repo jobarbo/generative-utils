@@ -1047,6 +1047,19 @@ class ShaderEffectsPanel {
 			hue: {min: 0, max: 360, step: 0.1}, // colorTint — degrees
 			saturation: {min: 0, max: 2, step: 0.01},
 			tintcolor: {min: 0, max: 1, step: 0.001}, // per RGB component
+			tintmode: {min: 0, max: 3, step: 1, integer: true}, // multiply screen softlight colorize
+			shiftaxis: {min: 0, max: 1, step: 1, integer: true}, // pixelShift — 0 ←→, 1 ↑↓
+			shiftbands: {min: 1, max: 256, step: 1, integer: true},
+			shiftdirection: {min: 0, max: 3, step: 1, integer: true}, // left right alt random
+			shiftspread: {min: 0, max: 1, step: 0.01},
+			shiftgradient: {min: -1, max: 1, step: 0.01},
+			shiftseed: {min: 0, max: 64, step: 1, integer: true},
+			ringbands: {min: 1, max: 128, step: 1, integer: true}, // pixelRing
+			ringradius: {min: 0.05, max: 1.5, step: 0.01}, // short-edge units
+			ringdirection: {min: 0, max: 3, step: 1, integer: true}, // ccw cw alt random
+			ringspread: {min: 0, max: 1, step: 0.01},
+			ringgradient: {min: -1, max: 1, step: 0.01},
+			ringseed: {min: 0, max: 64, step: 1, integer: true},
 		};
 
 		if (exact[k]) {
@@ -1230,6 +1243,10 @@ class ShaderEffectsPanel {
 			blurdirection: "blur direction",
 			grainsize: "grain size",
 			levels: "levels (2–256)",
+			shiftaxis: "axis (0 ←→ / 1 ↑↓)",
+			shiftdirection: "direction (0 ←↑ / 1 →↓ / 2 alt / 3 rand)",
+			ringdirection: "direction (0 ↺ / 1 ↻ / 2 alt / 3 rand)",
+			tintmode: "tint mode (0 mult / 1 screen / 2 soft / 3 color)",
 		};
 		if (labels[k]) return labels[k];
 
