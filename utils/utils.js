@@ -184,6 +184,12 @@ function isInIframe() {
 	}
 }
 
+// Embedded (iframe) = viewer only: flag <html> as early as possible so CSS
+// (paramsPanel.css → html.is-embedded) strips every dev/debug UI element.
+if (typeof document !== "undefined" && isInIframe()) {
+	document.documentElement.classList.add("is-embedded");
+}
+
 // Check if the user is on Safari mobile
 function isSafariMobile() {
 	const ua = window.navigator.userAgent;
@@ -570,6 +576,7 @@ document.addEventListener("keydown", toggleGuides);
 function toggleGuides(event) {
 	// Toggle guides when 'g' key is pressed
 	if (event.key === "g") {
+		if (isInIframe()) return;
 		let guideContainer = document.querySelector(".guide-container");
 
 		// Create guide container if it doesn't exist
@@ -1268,7 +1275,7 @@ function updateDebugOverlay({debugBounds = false, padding = 0.1, movers = [], ov
 	const moverBoundsEl = document.getElementById(moverBoundsId);
 	if (!debugOverlay) return;
 
-	if (!debugBounds) {
+	if (!debugBounds || isInIframe()) {
 		debugOverlay.classList.remove("visible");
 		return;
 	}

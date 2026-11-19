@@ -77,6 +77,21 @@ canvas.p5Canvas.presentation.horizontal {
 	max-height: 85vw !important;
 }
 
+/* ---- Embedded (iframe) — viewer only, no dev/debug UI ----
+   html.is-embedded is set by utils.js. display:none (not off-screen) so
+   nothing leaks in, e.g. the hidden .container's box-shadow. */
+html.is-embedded .container,
+html.is-embedded .params-toggles,
+html.is-embedded .info-toggle,
+html.is-embedded .generate-toggle,
+html.is-embedded .shader-effects-panel,
+html.is-embedded .shader-panel-toggle,
+html.is-embedded #controls,
+html.is-embedded .debug-bounds,
+html.is-embedded .guide-container {
+	display: none !important;
+}
+
 /* ---- Slide-out panel chrome ---- */
 
 .container {
