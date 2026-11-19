@@ -14,15 +14,18 @@ main.main {
 	position: relative;
 }
 
+/* main.main fills the viewport, so the frame contain-fits itself to the
+   artwork ratio (same formula as canvas.p5Canvas in style.css) and centers. */
 span.frame {
 	position: absolute;
-	top: 0;
-	left: 0;
+	inset: 0;
+	margin: auto;
+	box-sizing: border-box;
 	visibility: hidden;
 	opacity: 0;
 	border: var(--params-panel-frame) 0.9vh solid;
-	width: 100%;
-	height: 100%;
+	width: min(100vw, calc(100vh * var(--art-w, 1) / var(--art-h, 1)));
+	height: min(100vh, calc(100vw * var(--art-h, 1) / var(--art-w, 1)));
 	z-index: 4;
 	transform: rotate(0deg);
 	box-shadow:
@@ -48,6 +51,9 @@ span.frame.presentation {
 
 span.frame.presentation.horizontal {
 	transform: rotate(90deg);
+	/* Rotated 90°: fit the swapped dimensions into the viewport */
+	width: min(100vh, calc(100vw * var(--art-w, 1) / var(--art-h, 1)));
+	height: min(100vw, calc(100vh * var(--art-h, 1) / var(--art-w, 1)));
 }
 
 canvas.p5Canvas.presentation {
