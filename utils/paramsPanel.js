@@ -61,6 +61,9 @@
 	}
 
 	function controlsPersistEnabled() {
+		// Embedded (iframe) = viewer context: always show the token's defaults, never
+		// restore/save panel edits (localStorage is shared with the same-origin top-level page).
+		if (typeof isInIframe === "function" && isInIframe()) return false;
 		return typeof PERSIST_CONTROLS_PANEL === "undefined" || !!PERSIST_CONTROLS_PANEL;
 	}
 
